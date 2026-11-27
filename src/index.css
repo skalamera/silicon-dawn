@@ -90,3 +90,76 @@ dialog::backdrop {
 .tactical-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(56, 189, 248, 0.6);
 }
+
+/* Call of Duty 4-inspired Home Screen Typography & Motion */
+.home-title {
+  font-size: clamp(2.25rem, 1.3rem + 4.4vw, 5.25rem);
+  line-height: 0.98;
+  text-wrap: balance;
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #e2ebe2 34%,
+    #9ba89d 54%,
+    #6c786e 64%,
+    #dbe4dc 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.85))
+    drop-shadow(0 1px 0 rgba(10, 18, 12, 0.95));
+}
+
+.home-subtitle {
+  font-size: clamp(0.8rem, 0.68rem + 0.55vw, 1.15rem);
+  color: #7ef9a8;
+  text-shadow:
+    0 0 18px rgba(74, 222, 128, 0.72),
+    0 0 4px rgba(167, 243, 208, 0.9),
+    0 2px 6px rgba(0, 0, 0, 0.85);
+}
+
+@keyframes homeHeroDrift {
+  0% {
+    transform: scale(1.03) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.07) translate3d(-1.2%, -0.6%, 0);
+  }
+  100% {
+    transform: scale(1.03) translate3d(0, 0, 0);
+  }
+}
+
+@keyframes homeFogDrift {
+  0% {
+    transform: translate3d(-2%, 0, 0) scale(1.05);
+    opacity: 0.42;
+  }
+  50% {
+    transform: translate3d(2%, -1%, 0) scale(1.1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(-2%, 0, 0) scale(1.05);
+    opacity: 0.42;
+  }
+}
+
+.home-hero-drift {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: homeHeroDrift 24s ease-in-out infinite;
+  }
+}
+
+.home-fog-layer {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: homeFogDrift 18s ease-in-out infinite;
+  }
+}
+
+.motion-paused .home-hero-drift,
+.motion-paused .home-fog-layer {
+  animation-play-state: paused;
+}

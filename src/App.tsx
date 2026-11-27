@@ -5,7 +5,7 @@ import {
   getVictoryCutscene,
   type CutsceneScript,
 } from './data/cutscenes';
-import { getMissionById, type MissionDef } from './data/missions';
+import { getMissionById, MISSIONS, type MissionDef } from './data/missions';
 import { InputController } from './input/InputController';
 import { CanvasRenderer, type ArmedTargeting } from './renderer/CanvasRenderer';
 import { DEMO_CHAPTERS, createDemoState, triggerDemoChapter } from './sim/demo';
@@ -24,6 +24,7 @@ import { CampaignModal } from './ui/CampaignModal';
 import { CommandSidebar } from './ui/CommandSidebar';
 import { CutsceneModal } from './ui/CutsceneModal';
 import { DemoHud } from './ui/DemoHud';
+import { HomeScreen } from './ui/HomeScreen';
 import { MissionTracker } from './ui/MissionTracker';
 import { NewMatchModal } from './ui/NewMatchModal';
 import { RadialMenu, type RadialMenuTarget } from './ui/RadialMenu';
@@ -83,7 +84,8 @@ export function App() {
   const inputRef = useRef<InputController | null>(null);
 
   const overlayRef = useRef<OverlayMode>('tactical');
-  const speedRef = useRef<0 | 0.5 | 1 | 2>(1);
+  const speedRef = useRef<0 | 0.5 | 1 | 2>(0);
+  const screenModeRef = useRef<'home' | 'play'>('home');
   const selectedRef = useRef<Set<string>>(new Set());
   const boxSelectRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const hoverTileRef = useRef<{ tx: number; ty: number } | null>(null);
@@ -97,9 +99,11 @@ export function App() {
   const settingsRef = useRef<UserSettings>(loadUserSettings());
 
   const [hudState, setHudState] = useState<GameState>(() => stateRef.current);
+  const [screenMode, setScreenMode] = useState<'home' | 'play'>('home');
+  const [hasActiveSession, setHasActiveSession] = useState(false);
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('tactical');
   const [emVisited, setEmVisited] = useState(false);
-  const [simSpeed, setSimSpeed] = useState<0 | 0.5 | 1 | 2>(1);
+  const [simSpeed, setSimSpeed] = useState<0 | 0.5 | 1 | 2>(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [attackMoveArmed, setAttackMoveArmed] = useState(false);
   const [armedTargeting, setArmedTargeting] = useState<ArmedTargeting>(null);
@@ -119,7 +123,7 @@ export function App() {
   const [demoActive, setDemoActive] = useState(false);
   const [demoChapter, setDemoChapter] = useState(0);
   const [demoAutoPlay, setDemoAutoPlay] = useState(true);
-  const [walkthroughActive, setWalkthroughActive] = useState(() => initialFirstBootRef.current);
+  const [walkthroughActive, setWalkthroughActive] = useState(false);
   const [walkthroughStep, setWalkthroughStep] = useState(0);
   const [lastOrderTick, setLastOrderTick] = useState(0);
 
@@ -164,6 +168,30 @@ export function App() {
     }
   }, [refreshSlots, showToast]);
 
+  const enterPlayMode = useCallback(() => {
+    screenModeRef.current = 'play';
+    setScreenMode('play');
+    setHasActiveSession(true);
+  }, []);
+
+  const returnToHome = useCallback(() => {
+    speedRef.current = 0;
+    setSimSpeed(0);
+    screenModeRef.current = 'home';
+    setScreenMode('home');
+    setWalkthroughActive(false);
+  }, []);
+
+  const resumeActiveSession = useCallback(() => {
+    soundEngine.unlock();
+    screenModeRef.current = 'play';
+    setScreenMode('play');
+    if (!stateRef.current.winnerId && !activeCutscene) {
+      speedRef.current = 1;
+      setSimSpeed(1);
+    }
+  }, [activeCutscene]);
+
   const handleQuickLoad = useCallback(async () => {
     try {
       const rec = await saveStorage.loadSlot('quicksave');
@@ -173,12 +201,17 @@ export function App() {
       }
       stateRef.current = rec.payload.state;
       inputRef.current?.setSelection([]);
+      const cam = getConyardCenter(stateRef.current);
+      inputRef.current?.setCameraCenter(cam.x, cam.y, 0.9);
+      speedRef.current = 1;
+      setSimSpeed(1);
+      enterPlayMode();
       setHudState({ ...stateRef.current });
       showToast('Quick Save loaded');
     } catch {
       showToast('Failed to load Quick Save');
     }
-  }, [showToast]);
+  }, [enterPlayMode, showToast]);
 
   // Unlock Web Audio on first user interaction + listen for PWA install prompt
   useEffect(() => {
@@ -264,6 +297,7 @@ export function App() {
         onOpenRadialMenu: (pos) => {
           setRadialMenu(pos);
         },
+        isBlocked: () => screenModeRef.current === 'home',
       },
       { x: initCam.x, y: initCam.y, zoom: 0.9 }
     );
@@ -423,11 +457,12 @@ export function App() {
     stateRef.current = createDemoState();
     recordedWinRef.current = null;
     seenEffectsRef.current.clear();
+    enterPlayMode();
     setDemoActive(true);
     setDemoAutoPlay(true);
     selectDemoChapter(0);
     showToast('Feature Showcase Demo started — watch live systems in action');
-  }, [selectDemoChapter, showToast]);
+  }, [enterPlayMode, selectDemoChapter, showToast]);
 
   useEffect(() => {
     if (!demoActive || !demoAutoPlay) return;
@@ -455,12 +490,18 @@ export function App() {
     inputRef.current?.setCameraCenter(cam.x, cam.y, 0.9);
     speedRef.current = 1;
     setSimSpeed(1);
+    enterPlayMode();
     setHudState({ ...fresh });
     showToast(`Deployed ${config.playerFaction.toUpperCase()} on ${fresh.map.name}`);
   };
 
   const launchMission = (mission: MissionDef) => {
-    setWalkthroughActive(false);
+    const runBootTour = mission.id === 'boot_sequence' && !hasCompletedWalkthrough();
+    setWalkthroughActive(runBootTour);
+    if (runBootTour) {
+      setWalkthroughStep(0);
+      setLastOrderTick(0);
+    }
     startNewMatch({
       seed: 2026 + mission.id.length * 131,
       playerFaction: mission.faction,
@@ -541,6 +582,7 @@ export function App() {
         onOpenCampaign={() => setCampaignOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onStartDemo={startDemoMode}
+        onReturnHome={returnToHome}
       />
 
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
@@ -678,6 +720,27 @@ export function App() {
         />
       </div>
 
+      {screenMode === 'home' && (
+        <HomeScreen
+          hasActiveSession={hasActiveSession}
+          completedMissionCount={completedMissions.size}
+          totalMissionCount={MISSIONS.length}
+          saveSlotCount={saveSlots.length}
+          walkthroughCompleted={hasCompletedWalkthrough()}
+          heroImageSrc="/assets/home-hero.jpg"
+          onResume={resumeActiveSession}
+          onOpenCampaign={() => setCampaignOpen(true)}
+          onOpenSkirmish={() => setNewMatchOpen(true)}
+          onStartTutorial={replayWalkthrough}
+          onStartDemo={startDemoMode}
+          onOpenSaves={() => {
+            void refreshSlots();
+            setSaveModalOpen(true);
+          }}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      )}
+
       <SaveLoadModal
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
@@ -695,6 +758,11 @@ export function App() {
           if (!rec) return;
           stateRef.current = deserializeGameState(rec.payload);
           inputRef.current?.setSelection([]);
+          const cam = getConyardCenter(stateRef.current);
+          inputRef.current?.setCameraCenter(cam.x, cam.y, 0.9);
+          speedRef.current = 1;
+          setSimSpeed(1);
+          enterPlayMode();
           setHudState({ ...stateRef.current });
           setSaveModalOpen(false);
           showToast(`Loaded "${rec.meta.name}"`);
@@ -712,6 +780,11 @@ export function App() {
           const { state } = await importSaveFromFile(file);
           stateRef.current = state;
           inputRef.current?.setSelection([]);
+          const cam = getConyardCenter(stateRef.current);
+          inputRef.current?.setCameraCenter(cam.x, cam.y, 0.9);
+          speedRef.current = 1;
+          setSimSpeed(1);
+          enterPlayMode();
           setHudState({ ...stateRef.current });
           setSaveModalOpen(false);
           showToast(`Imported ${file.name}`);
@@ -767,7 +840,7 @@ export function App() {
       />
 
       <WalkthroughOverlay
-        active={walkthroughActive && !activeCutscene && !demoActive}
+        active={screenMode === 'play' && walkthroughActive && !activeCutscene && !demoActive}
         step={walkthroughStep}
         state={hudState}
         selectedIds={selectedIds}

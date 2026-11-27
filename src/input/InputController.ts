@@ -20,6 +20,7 @@ export interface InputCallbacks {
   getBoxSelectMode: () => boolean;
   getTouchRadialEnabled?: () => boolean;
   onOpenRadialMenu?: (pos: { sx: number; sy: number; wx: number; wy: number }) => void;
+  isBlocked?: () => boolean;
 }
 
 export class InputController {
@@ -76,6 +77,7 @@ export class InputController {
   }
 
   public updateCamera(dt: number): void {
+    if (this.cb.isBlocked?.()) return;
     const panSpeed = 560 / this.camera.zoom;
     let dx = 0;
     let dy = 0;
@@ -472,6 +474,7 @@ export class InputController {
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
+    if (this.cb.isBlocked?.()) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     this.keys.add(e.code);
 

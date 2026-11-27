@@ -248,7 +248,7 @@ class SoundEngine {
   ): void {
     if (!this.prefs.voice) return;
     if (audioUrl) {
-      this.playNarratorClip(audioUrl, text, 0.86);
+      this.playNarratorClip(audioUrl, text, 0.96);
       return;
     }
     const rate = faction === 'pact' ? 0.86 : faction === 'axis' ? 0.9 : 0.88;

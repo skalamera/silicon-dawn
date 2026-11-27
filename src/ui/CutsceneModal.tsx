@@ -73,19 +73,31 @@ export function CutsceneModal({ script, onClose }: CutsceneModalProps) {
     soundEngine.speakCommander(currentBeat.line, currentBeat.faction, currentBeat.audioUrl);
 
     const flashTimer = window.setTimeout(() => setStaticFlash(false), 260);
-    const typeTimer = window.setInterval(() => {
-      setTypedLen((len) => {
-        if (len >= currentBeat.line.length) {
-          window.clearInterval(typeTimer);
-          return len;
-        }
-        return len + 1;
-      });
-    }, 46);
+    let typeTimer: number | null = null;
+    let cancelled = false;
+    let cursor = 0;
+
+    const advanceChar = () => {
+      if (cancelled || cursor >= currentBeat.line.length) return;
+      cursor += 1;
+      setTypedLen(cursor);
+      if (cursor >= currentBeat.line.length) return;
+      const ch = currentBeat.line[cursor - 1];
+      const delay =
+        ch === '.' || ch === '!' || ch === '?'
+          ? 480
+          : ch === ',' || ch === ';' || ch === ':' || ch === '—'
+          ? 240
+          : 36;
+      typeTimer = window.setTimeout(advanceChar, delay);
+    };
+
+    typeTimer = window.setTimeout(advanceChar, 80);
 
     return () => {
+      cancelled = true;
       window.clearTimeout(flashTimer);
-      window.clearInterval(typeTimer);
+      if (typeTimer !== null) window.clearTimeout(typeTimer);
       soundEngine.stopVoice();
     };
   }, [open, beatIdx, currentBeat]);

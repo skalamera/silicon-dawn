@@ -79,9 +79,9 @@ export function CutsceneModal({ script, onClose }: CutsceneModalProps) {
           window.clearInterval(typeTimer);
           return len;
         }
-        return len + 2;
+        return len + 1;
       });
-    }, 24);
+    }, 46);
 
     return () => {
       window.clearTimeout(flashTimer);

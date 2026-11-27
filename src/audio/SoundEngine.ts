@@ -77,12 +77,14 @@ class SoundEngine {
     }
   }
 
-  public playNarratorClip(url: string, fallbackText?: string): void {
+  public playNarratorClip(url: string, fallbackText?: string, playbackRate = 0.92): void {
     if (!this.prefs.voice || typeof window === 'undefined') return;
     this.stopVoice();
     try {
       const audio = new Audio(url);
       audio.volume = 0.92;
+      audio.playbackRate = playbackRate;
+      (audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
       this.activeVoiceAudio = audio;
       audio.addEventListener('ended', () => {
         if (this.activeVoiceAudio === audio) {
@@ -95,12 +97,12 @@ class SoundEngine {
         }
         const name = err instanceof DOMException ? err.name : '';
         if (fallbackText && name !== 'NotAllowedError' && name !== 'AbortError') {
-          this.speakSpeechSynthesis(fallbackText, 1.0, 0.78);
+          this.speakSpeechSynthesis(fallbackText, playbackRate, 0.78);
         }
       });
     } catch {
       if (fallbackText) {
-        this.speakSpeechSynthesis(fallbackText, 1.0, 0.78);
+        this.speakSpeechSynthesis(fallbackText, playbackRate, 0.78);
       }
     }
   }
@@ -246,10 +248,10 @@ class SoundEngine {
   ): void {
     if (!this.prefs.voice) return;
     if (audioUrl) {
-      this.playNarratorClip(audioUrl, text);
+      this.playNarratorClip(audioUrl, text, 0.86);
       return;
     }
-    const rate = faction === 'pact' ? 0.96 : faction === 'axis' ? 1.04 : 1.0;
+    const rate = faction === 'pact' ? 0.86 : faction === 'axis' ? 0.9 : 0.88;
     const pitch = faction === 'pact' ? 0.72 : faction === 'axis' ? 0.88 : 0.82;
     this.speakSpeechSynthesis(text, rate, pitch);
   }
@@ -287,10 +289,10 @@ class SoundEngine {
 
     const clip = this.resolveEvaClip(text);
     if (clip) {
-      this.playNarratorClip(clip, text);
+      this.playNarratorClip(clip, text, 0.92);
       return;
     }
-    this.speakSpeechSynthesis(text, 1.02, 0.78);
+    this.speakSpeechSynthesis(text, 0.92, 0.78);
   }
 
   private startMusicLoop(): void {

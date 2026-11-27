@@ -35,9 +35,7 @@ export function CutsceneModal({ script, onClose }: CutsceneModalProps) {
     if (!dialog) return;
     const handleClose = () => {
       dialog.returnValue = '';
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      soundEngine.stopVoice();
       onClose();
     };
     dialog.addEventListener('close', handleClose);
@@ -72,7 +70,7 @@ export function CutsceneModal({ script, onClose }: CutsceneModalProps) {
     setStaticFlash(true);
     soundEngine.unlock();
     soundEngine.playRadioStatic();
-    soundEngine.speakCommander(currentBeat.line, currentBeat.faction);
+    soundEngine.speakCommander(currentBeat.line, currentBeat.faction, currentBeat.audioUrl);
 
     const flashTimer = window.setTimeout(() => setStaticFlash(false), 260);
     const typeTimer = window.setInterval(() => {
@@ -88,6 +86,7 @@ export function CutsceneModal({ script, onClose }: CutsceneModalProps) {
     return () => {
       window.clearTimeout(flashTimer);
       window.clearInterval(typeTimer);
+      soundEngine.stopVoice();
     };
   }, [open, beatIdx, currentBeat]);
 

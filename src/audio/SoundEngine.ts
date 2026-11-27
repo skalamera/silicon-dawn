@@ -9,6 +9,7 @@ interface AudioPrefs {
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private musicTimer: number | null = null;
+  private activeVoiceAudio: HTMLAudioElement | null = null;
   private stepIdx = 0;
   private battleIntensity = 0; // 0..1
   private lastVoiceAt = 0;
@@ -51,7 +52,72 @@ class SoundEngine {
   public toggleVoice(): boolean {
     this.prefs.voice = !this.prefs.voice;
     this.savePrefs();
+    if (!this.prefs.voice) {
+      this.stopVoice();
+    }
     return this.prefs.voice;
+  }
+
+  public stopVoice(): void {
+    if (this.activeVoiceAudio) {
+      try {
+        this.activeVoiceAudio.pause();
+        this.activeVoiceAudio.currentTime = 0;
+      } catch {
+        // Ignore media reset errors
+      }
+      this.activeVoiceAudio = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        // Ignore speech cancellation errors
+      }
+    }
+  }
+
+  public playNarratorClip(url: string, fallbackText?: string): void {
+    if (!this.prefs.voice || typeof window === 'undefined') return;
+    this.stopVoice();
+    try {
+      const audio = new Audio(url);
+      audio.volume = 0.92;
+      this.activeVoiceAudio = audio;
+      audio.addEventListener('ended', () => {
+        if (this.activeVoiceAudio === audio) {
+          this.activeVoiceAudio = null;
+        }
+      });
+      void audio.play().catch((err: unknown) => {
+        if (this.activeVoiceAudio === audio) {
+          this.activeVoiceAudio = null;
+        }
+        const name = err instanceof DOMException ? err.name : '';
+        if (fallbackText && name !== 'NotAllowedError' && name !== 'AbortError') {
+          this.speakSpeechSynthesis(fallbackText, 1.0, 0.78);
+        }
+      });
+    } catch {
+      if (fallbackText) {
+        this.speakSpeechSynthesis(fallbackText, 1.0, 0.78);
+      }
+    }
+  }
+
+  private speakSpeechSynthesis(text: string, rate: number, pitch: number): void {
+    if (!this.prefs.voice || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      const clean = text.replace(/\([^)]*\)/g, '').replace(/[!]/g, '.');
+      const utter = new SpeechSynthesisUtterance(clean);
+      utter.rate = rate;
+      utter.pitch = pitch;
+      utter.volume = 0.8;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // Ignore speech synthesis errors
+    }
   }
 
   public unlock(): void {
@@ -173,36 +239,58 @@ class SoundEngine {
     osc.stop(t + 0.15);
   }
 
-  public speakCommander(text: string, faction: 'alliance' | 'pact' | 'axis'): void {
-    if (!this.prefs.voice || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    try {
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = faction === 'pact' ? 0.96 : faction === 'axis' ? 1.04 : 1.0;
-      utter.pitch = faction === 'pact' ? 0.72 : faction === 'axis' ? 0.88 : 0.82;
-      utter.volume = 0.8;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utter);
-    } catch {
-      // Ignore speech synthesis errors
+  public speakCommander(
+    text: string,
+    faction: 'alliance' | 'pact' | 'axis',
+    audioUrl?: string
+  ): void {
+    if (!this.prefs.voice) return;
+    if (audioUrl) {
+      this.playNarratorClip(audioUrl, text);
+      return;
     }
+    const rate = faction === 'pact' ? 0.96 : faction === 'axis' ? 1.04 : 1.0;
+    const pitch = faction === 'pact' ? 0.72 : faction === 'axis' ? 0.88 : 0.82;
+    this.speakSpeechSynthesis(text, rate, pitch);
+  }
+
+  private resolveEvaClip(text: string): string | null {
+    if (text.includes('SUPERWEAPON READY')) return '/assets/voice/eva_superweapon_ready.mp3';
+    if (text.includes('False Order Injection requires')) return '/assets/voice/eva_false_orders_req.mp3';
+    if (text.includes('Operation active')) return '/assets/voice/eva_operation_active.mp3';
+    if (text.includes('LOW POWER')) return '/assets/voice/eva_low_power.mp3';
+    if (text.includes('THERMAL MELTDOWN')) return '/assets/voice/eva_thermal_meltdown.mp3';
+    if (text.includes('ready')) return '/assets/voice/eva_construction_ready.mp3';
+    if (text.includes('Insufficient Silicon')) return '/assets/voice/eva_insufficient_silicon.mp3';
+    if (text.includes('Cannot deploy')) return '/assets/voice/eva_cannot_deploy.mp3';
+    if (text.includes('Server Farm destroyed')) return '/assets/voice/eva_server_destroyed.mp3';
+    if (text.includes('Q-DAY ACHIEVED')) return '/assets/voice/eva_qday_achieved.mp3';
+    if (text.includes('RANSOMWARE LOCK')) return '/assets/voice/eva_ransomware.mp3';
+    if (text.includes('PROJECT PROMETHEUS')) return '/assets/voice/eva_prometheus.mp3';
+    if (text.includes('KESSLER CASCADE')) return '/assets/voice/eva_kessler.mp3';
+    if (text.includes('STRAIT CHOKEPOINT')) return '/assets/voice/eva_chokepoint.mp3';
+    if (text.includes('captured!')) return '/assets/voice/eva_captured.mp3';
+    if (text.includes('Victory')) return '/assets/voice/eva_victory.mp3';
+    if (text.includes('Defeat') || text.includes('Command lost')) return '/assets/voice/eva_defeat.mp3';
+    return null;
   }
 
   public speakEva(text: string): void {
-    if (!this.prefs.voice || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (!this.prefs.voice || typeof window === 'undefined') return;
+    const urgent =
+      text.includes('Operation active') ||
+      text.includes('Victory') ||
+      text.includes('Command lost');
     const now = performance.now();
-    if (now - this.lastVoiceAt < 3800) return;
+    if (!urgent && now - this.lastVoiceAt < 3800) return;
     this.lastVoiceAt = now;
-    try {
-      const clean = text.replace(/\([^)]*\)/g, '').replace(/[!]/g, '.');
-      const utter = new SpeechSynthesisUtterance(clean);
-      utter.rate = 1.06;
-      utter.pitch = 0.85;
-      utter.volume = 0.72;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utter);
-    } catch {
-      // Ignore speech synthesis errors
+
+    const clip = this.resolveEvaClip(text);
+    if (clip) {
+      this.playNarratorClip(clip, text);
+      return;
     }
+    this.speakSpeechSynthesis(text, 1.02, 0.78);
   }
 
   private startMusicLoop(): void {

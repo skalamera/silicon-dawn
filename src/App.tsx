@@ -19,7 +19,9 @@ import {
   type SaveSlotMeta,
 } from './storage';
 import {
+  getBonusMissions,
   getCompletedMissions,
+  markMissionBonusCompleted,
   markMissionCompleted,
   resetCampaignProgress,
 } from './storage/campaignProgress';
@@ -121,6 +123,7 @@ export function App() {
   const [radialMenu, setRadialMenu] = useState<RadialMenuTarget | null>(null);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [completedMissions, setCompletedMissions] = useState<Set<string>>(() => getCompletedMissions());
+  const [bonusMissions, setBonusMissions] = useState<Set<string>>(() => getBonusMissions());
   const [saveSlots, setSaveSlots] = useState<SaveSlotMeta[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -183,6 +186,7 @@ export function App() {
   const openCampaignHub = useCallback(() => {
     speedRef.current = 0;
     setSimSpeed(0);
+    soundEngine.stopVoice();
     setPauseMenuOpen(false);
     setWalkthroughActive(false);
     screenModeRef.current = 'campaign';
@@ -209,6 +213,7 @@ export function App() {
   const quitToMenu = useCallback(() => {
     speedRef.current = 0;
     setSimSpeed(0);
+    soundEngine.stopVoice();
     setPauseMenuOpen(false);
     setDemoActive(false);
     setWalkthroughActive(false);
@@ -461,16 +466,27 @@ export function App() {
       );
       soundEngine.setBattleIntensity(intensity);
 
-      // Record Campaign victory + trigger FMV debrief cutscene
+      // Record Campaign victory + trigger FMV debrief or Skirmish/Defeat voiceover
       if (st.winnerId === 'p1' && st.missionId && recordedWinRef.current !== st.missionId) {
         recordedWinRef.current = st.missionId;
         setCompletedMissions(markMissionCompleted(st.missionId));
         const mission = getMissionById(st.missionId);
+        if (mission?.bonusObjective.check(st, { emVisited: true, overlayMode: overlayRef.current })) {
+          setBonusMissions(markMissionBonusCompleted(st.missionId));
+        }
         speedRef.current = 0;
         setSimSpeed(0);
         setActiveCutscene(
           getVictoryCutscene(st.config.playerFaction, mission?.title ?? st.missionId)
         );
+      } else if (st.winnerId && !st.missionId && recordedWinRef.current !== `skirmish:${st.winnerId}`) {
+        recordedWinRef.current = `skirmish:${st.winnerId}`;
+        soundEngine.playNarratorClip(
+          st.winnerId === 'p1' ? '/assets/voice/eva_victory.mp3' : '/assets/voice/eva_defeat.mp3'
+        );
+      } else if (st.winnerId === 'ai1' && st.missionId && recordedWinRef.current !== `defeat:${st.missionId}`) {
+        recordedWinRef.current = `defeat:${st.missionId}`;
+        soundEngine.playNarratorClip('/assets/voice/eva_defeat.mp3');
       }
 
       rendererRef.current.render(
@@ -877,6 +893,7 @@ export function App() {
       {screenMode === 'campaign' && (
         <CampaignHub
           completedIds={completedMissions}
+          bonusIds={bonusMissions}
           saveSlots={saveSlots}
           heroImageSrc="/assets/home-hero.jpg"
           onBackToHome={() => {
@@ -893,6 +910,7 @@ export function App() {
           onImportFile={(file) => void handleImportSaveFile(file)}
           onResetProgress={() => {
             setCompletedMissions(resetCampaignProgress());
+            setBonusMissions(new Set());
             showToast('Campaign progress reset');
           }}
         />

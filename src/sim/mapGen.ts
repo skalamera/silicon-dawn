@@ -1,8 +1,8 @@
 import type { BuildingId } from '../data/defs';
 import type { MapBiome, MapData, MapId, TileKind } from './types';
 
-export const MAP_WIDTH = 72;
-export const MAP_HEIGHT = 54;
+export const MAP_WIDTH = 112;
+export const MAP_HEIGHT = 84;
 export const TILE_SIZE = 48;
 
 export interface MapMeta {
@@ -25,31 +25,31 @@ export const MAP_CATALOG: MapMeta[] = [
     id: 'peninsula_grid',
     name: 'Peninsula Grid',
     biome: 'arid',
-    description: 'Large 72×54 coastal peninsula with split central ridges, LNG Terminals & Subsea Fiber.',
+    description: 'Massive 112×84 coastal peninsula with split ridges, flanking corridors, LNG Terminals & Subsea Fiber.',
   },
   {
     id: 'strait_chokepoint',
     name: 'Strait Chokepoint',
     biome: 'arid',
-    description: 'Wide central littoral sea strait bridged by 2 concrete causeways; prime naval ambush terrain.',
+    description: 'Vast 112×84 central sea strait spanned by 3 concrete causeways; built for fortified defense and naval warfare.',
   },
   {
     id: 'arctic_cryo',
     name: 'Arctic Cryo-Basin',
     biome: 'arctic',
-    description: 'Glacial cooling rivers (+25% cooling), 2 Subsea Fiber Stations & Legacy Analog Radar.',
+    description: 'Glacial 112×84 cooling rivers (+25% cooling), 4 bridges, Subsea Fiber Stations & Legacy Analog Radar.',
   },
   {
     id: 'megacity_grid',
     name: 'Megacity Grid',
     biome: 'urban',
-    description: 'Sprawling urban avenue grid favoring Valkyries, Tunnel-Borers & Seismic Sensors.',
+    description: 'Sprawling 112×84 urban avenue blocks favoring Valkyries, Tunnel-Borers, Chokepoint Turrets & Seismic Sensors.',
   },
   {
     id: 'fab_corridor',
     name: 'Wafer Fab Corridor',
     biome: 'arid',
-    description: 'Expansive central Silicon valley with 6 high-yield clusters for large armored clashes.',
+    description: 'Expansive 112×84 central Silicon valley with 8 high-yield clusters for prolonged armored campaigns.',
   },
 ];
 
@@ -76,48 +76,54 @@ export function createMapById(mapId: MapId = 'peninsula_grid'): GeneratedMapBund
   const tiles: TileKind[] = new Array(w * h).fill('sand');
   const meta = MAP_CATALOG.find((m) => m.id === mapId) ?? MAP_CATALOG[0];
 
-  const p1Spawn = { tileX: 8, tileY: 44 };
-  const aiSpawn = { tileX: 61, tileY: 8 };
+  const p1Spawn = { tileX: 10, tileY: 72 };
+  const aiSpawn = { tileX: 98, tileY: 10 };
 
   const ensureBasePads = () => {
-    paintRect(tiles, w, h, 3, 40, 17, 50, 'concrete');
-    paintRect(tiles, w, h, 54, 3, 68, 13, 'concrete');
+    paintRect(tiles, w, h, 3, 63, 25, 80, 'concrete');
+    paintRect(tiles, w, h, 86, 3, 108, 20, 'concrete');
   };
 
   if (mapId === 'peninsula_grid') {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        if (x + y < 14) tiles[y * w + x] = 'water';
-        if (w - 1 - x + (h - 1 - y) < 14) tiles[y * w + x] = 'water';
-        if (y <= 3 && x < 42) tiles[y * w + x] = 'water';
-        if (y >= h - 4 && x >= 30) tiles[y * w + x] = 'water';
+        if (x + y < 22) tiles[y * w + x] = 'water';
+        if (w - 1 - x + (h - 1 - y) < 22) tiles[y * w + x] = 'water';
+        if (y <= 4 && x < 64) tiles[y * w + x] = 'water';
+        if (y >= h - 5 && x >= 48) tiles[y * w + x] = 'water';
       }
     }
     ensureBasePads();
-    // Split central rocky ridge with North, Center, and South corridors
-    paintRect(tiles, w, h, 32, 11, 38, 21, 'ridge');
-    paintRect(tiles, w, h, 32, 22, 38, 22, 'cliff');
-    paintRect(tiles, w, h, 33, 30, 39, 39, 'ridge');
-    paintRect(tiles, w, h, 33, 40, 39, 40, 'cliff');
-    paintRect(tiles, w, h, 26, 25, 45, 27, 'concrete');
-    // Flank tactical ridges
-    paintRect(tiles, w, h, 20, 18, 21, 24, 'ridge');
-    paintRect(tiles, w, h, 20, 25, 21, 25, 'cliff');
-    paintRect(tiles, w, h, 50, 28, 51, 34, 'ridge');
-    paintRect(tiles, w, h, 50, 35, 51, 35, 'cliff');
+    // Wide multi-lane central ridge plateaus & flanking terrain choke ridges
+    paintRect(tiles, w, h, 50, 16, 58, 33, 'ridge');
+    paintRect(tiles, w, h, 50, 34, 58, 34, 'cliff');
+    paintRect(tiles, w, h, 52, 48, 60, 65, 'ridge');
+    paintRect(tiles, w, h, 52, 66, 60, 66, 'cliff');
+    paintRect(tiles, w, h, 42, 39, 68, 43, 'concrete');
+
+    paintRect(tiles, w, h, 30, 26, 33, 37, 'ridge');
+    paintRect(tiles, w, h, 30, 38, 33, 38, 'cliff');
+    paintRect(tiles, w, h, 78, 44, 81, 55, 'ridge');
+    paintRect(tiles, w, h, 78, 56, 81, 56, 'cliff');
 
     return {
       map: { id: mapId, name: meta.name, biome: meta.biome, width: w, height: h, tileSize: TILE_SIZE, tiles },
       siliconNodes: [
-        { tileX: 6, tileY: 33, amount: 9500 },
-        { tileX: 62, tileY: 18, amount: 9500 },
-        { tileX: 25, tileY: 11, amount: 11500 },
-        { tileX: 44, tileY: 40, amount: 11500 },
+        { tileX: 8, tileY: 57, amount: 11000 },
+        { tileX: 21, tileY: 74, amount: 10500 },
+        { tileX: 99, tileY: 25, amount: 11000 },
+        { tileX: 87, tileY: 7, amount: 10500 },
+        { tileX: 38, tileY: 16, amount: 13000 },
+        { tileX: 70, tileY: 64, amount: 13000 },
+        { tileX: 46, tileY: 44, amount: 15000 },
+        { tileX: 64, tileY: 36, amount: 15000 },
       ],
       neutralBuildings: [
-        { defId: 'lng_terminal', tileX: 22, tileY: 45 },
-        { defId: 'lng_terminal', tileX: 48, tileY: 6 },
-        { defId: 'fiber_station', tileX: 22, tileY: 5 },
+        { defId: 'lng_terminal', tileX: 28, tileY: 72 },
+        { defId: 'lng_terminal', tileX: 80, tileY: 9 },
+        { defId: 'fiber_station', tileX: 32, tileY: 9 },
+        { defId: 'fiber_station', tileX: 76, tileY: 72 },
+        { defId: 'analog_radar', tileX: 54, tileY: 40 },
       ],
       p1Spawn,
       aiSpawn,
@@ -128,27 +134,33 @@ export function createMapById(mapId: MapId = 'peninsula_grid'): GeneratedMapBund
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const diag = x * 0.72 + y;
-        if (diag > 46 && diag < 56) tiles[y * w + x] = 'water';
+        if (diag > 73 && diag < 87) tiles[y * w + x] = 'water';
       }
     }
     ensureBasePads();
-    paintRect(tiles, w, h, 18, 30, 32, 34, 'concrete');
-    paintRect(tiles, w, h, 40, 18, 53, 22, 'concrete');
-    paintRect(tiles, w, h, 26, 12, 29, 17, 'ridge');
-    paintRect(tiles, w, h, 42, 36, 45, 41, 'ridge');
+    paintRect(tiles, w, h, 22, 52, 40, 56, 'concrete');
+    paintRect(tiles, w, h, 48, 38, 63, 42, 'concrete');
+    paintRect(tiles, w, h, 72, 23, 89, 27, 'concrete');
+    paintRect(tiles, w, h, 40, 16, 45, 25, 'ridge');
+    paintRect(tiles, w, h, 66, 58, 71, 67, 'ridge');
 
     return {
       map: { id: mapId, name: meta.name, biome: meta.biome, width: w, height: h, tileSize: TILE_SIZE, tiles },
       siliconNodes: [
-        { tileX: 6, tileY: 31, amount: 9500 },
-        { tileX: 62, tileY: 20, amount: 9500 },
-        { tileX: 19, tileY: 14, amount: 11000 },
-        { tileX: 50, tileY: 38, amount: 11000 },
+        { tileX: 9, tileY: 56, amount: 11000 },
+        { tileX: 22, tileY: 74, amount: 10500 },
+        { tileX: 98, tileY: 26, amount: 11000 },
+        { tileX: 86, tileY: 8, amount: 10500 },
+        { tileX: 28, tileY: 20, amount: 13500 },
+        { tileX: 80, tileY: 60, amount: 13500 },
+        { tileX: 53, tileY: 40, amount: 14500 },
       ],
       neutralBuildings: [
-        { defId: 'lng_terminal', tileX: 24, tileY: 43 },
-        { defId: 'lng_terminal', tileX: 45, tileY: 8 },
-        { defId: 'analog_radar', tileX: 34, tileY: 25 },
+        { defId: 'lng_terminal', tileX: 30, tileY: 70 },
+        { defId: 'lng_terminal', tileX: 78, tileY: 11 },
+        { defId: 'analog_radar', tileX: 54, tileY: 39 },
+        { defId: 'fiber_station', tileX: 31, tileY: 53 },
+        { defId: 'fiber_station', tileX: 79, tileY: 24 },
       ],
       p1Spawn,
       aiSpawn,
@@ -156,26 +168,34 @@ export function createMapById(mapId: MapId = 'peninsula_grid'): GeneratedMapBund
   }
 
   if (mapId === 'arctic_cryo') {
-    paintRect(tiles, w, h, 0, 23, 71, 29, 'water');
-    paintRect(tiles, w, h, 12, 23, 17, 29, 'concrete');
-    paintRect(tiles, w, h, 33, 23, 38, 29, 'concrete');
-    paintRect(tiles, w, h, 54, 23, 59, 29, 'concrete');
+    paintRect(tiles, w, h, 0, 36, 111, 45, 'water');
+    paintRect(tiles, w, h, 14, 36, 20, 45, 'concrete');
+    paintRect(tiles, w, h, 38, 36, 44, 45, 'concrete');
+    paintRect(tiles, w, h, 64, 36, 70, 45, 'concrete');
+    paintRect(tiles, w, h, 88, 36, 94, 45, 'concrete');
     ensureBasePads();
-    paintRect(tiles, w, h, 24, 12, 28, 17, 'ridge');
-    paintRect(tiles, w, h, 43, 35, 47, 40, 'ridge');
+    paintRect(tiles, w, h, 36, 16, 42, 24, 'ridge');
+    paintRect(tiles, w, h, 68, 56, 74, 64, 'ridge');
 
     return {
       map: { id: mapId, name: meta.name, biome: meta.biome, width: w, height: h, tileSize: TILE_SIZE, tiles },
       siliconNodes: [
-        { tileX: 20, tileY: 36, amount: 9500 },
-        { tileX: 49, tileY: 15, amount: 9500 },
-        { tileX: 33, tileY: 9, amount: 11500 },
-        { tileX: 36, tileY: 43, amount: 11500 },
+        { tileX: 10, tileY: 56, amount: 11000 },
+        { tileX: 24, tileY: 74, amount: 10500 },
+        { tileX: 98, tileY: 26, amount: 11000 },
+        { tileX: 84, tileY: 8, amount: 10500 },
+        { tileX: 50, tileY: 14, amount: 13500 },
+        { tileX: 56, tileY: 66, amount: 13500 },
+        { tileX: 28, tileY: 50, amount: 12000 },
+        { tileX: 80, tileY: 30, amount: 12000 },
       ],
       neutralBuildings: [
-        { defId: 'fiber_station', tileX: 7, tileY: 19 },
-        { defId: 'fiber_station', tileX: 62, tileY: 32 },
-        { defId: 'analog_radar', tileX: 35, tileY: 18 },
+        { defId: 'fiber_station', tileX: 14, tileY: 31 },
+        { defId: 'fiber_station', tileX: 92, tileY: 48 },
+        { defId: 'analog_radar', tileX: 54, tileY: 29 },
+        { defId: 'analog_radar', tileX: 54, tileY: 50 },
+        { defId: 'lng_terminal', tileX: 30, tileY: 70 },
+        { defId: 'lng_terminal', tileX: 78, tileY: 11 },
       ],
       p1Spawn,
       aiSpawn,
@@ -183,16 +203,18 @@ export function createMapById(mapId: MapId = 'peninsula_grid'): GeneratedMapBund
   }
 
   if (mapId === 'megacity_grid') {
-    paintRect(tiles, w, h, 0, 0, 71, 53, 'concrete');
-    paintRect(tiles, w, h, 0, 0, 8, 8, 'water');
-    paintRect(tiles, w, h, 63, 45, 71, 53, 'water');
+    paintRect(tiles, w, h, 0, 0, 111, 83, 'concrete');
+    paintRect(tiles, w, h, 0, 0, 12, 12, 'water');
+    paintRect(tiles, w, h, 99, 71, 111, 83, 'water');
     ensureBasePads();
     const blocks = [
-      [24, 14, 29, 18],
-      [42, 14, 47, 18],
-      [24, 34, 29, 38],
-      [42, 34, 47, 38],
-      [33, 24, 38, 28],
+      [34, 20, 42, 26],
+      [68, 20, 76, 26],
+      [34, 54, 42, 60],
+      [68, 54, 76, 60],
+      [50, 36, 60, 44],
+      [20, 36, 26, 44],
+      [84, 36, 90, 44],
     ];
     for (const [x1, y1, x2, y2] of blocks) {
       paintRect(tiles, w, h, x1, y1, x2, y2 - 1, 'ridge');
@@ -202,15 +224,21 @@ export function createMapById(mapId: MapId = 'peninsula_grid'): GeneratedMapBund
     return {
       map: { id: mapId, name: meta.name, biome: meta.biome, width: w, height: h, tileSize: TILE_SIZE, tiles },
       siliconNodes: [
-        { tileX: 7, tileY: 32, amount: 9500 },
-        { tileX: 62, tileY: 20, amount: 9500 },
-        { tileX: 34, tileY: 9, amount: 11500 },
-        { tileX: 36, tileY: 43, amount: 11500 },
+        { tileX: 10, tileY: 56, amount: 11000 },
+        { tileX: 23, tileY: 74, amount: 10500 },
+        { tileX: 98, tileY: 26, amount: 11000 },
+        { tileX: 85, tileY: 8, amount: 10500 },
+        { tileX: 53, tileY: 14, amount: 13500 },
+        { tileX: 55, tileY: 66, amount: 13500 },
+        { tileX: 44, tileY: 39, amount: 14500 },
+        { tileX: 65, tileY: 39, amount: 14500 },
       ],
       neutralBuildings: [
-        { defId: 'analog_radar', tileX: 25, tileY: 25 },
-        { defId: 'analog_radar', tileX: 45, tileY: 25 },
-        { defId: 'lng_terminal', tileX: 34, tileY: 3 },
+        { defId: 'analog_radar', tileX: 36, tileY: 39 },
+        { defId: 'analog_radar', tileX: 72, tileY: 39 },
+        { defId: 'lng_terminal', tileX: 53, tileY: 5 },
+        { defId: 'lng_terminal', tileX: 55, tileY: 75 },
+        { defId: 'fiber_station', tileX: 30, tileY: 7 },
       ],
       p1Spawn,
       aiSpawn,
@@ -218,27 +246,31 @@ export function createMapById(mapId: MapId = 'peninsula_grid'): GeneratedMapBund
   }
 
   // 'fab_corridor'
-  paintRect(tiles, w, h, 0, 0, 7, 7, 'water');
-  paintRect(tiles, w, h, 64, 46, 71, 53, 'water');
+  paintRect(tiles, w, h, 0, 0, 11, 11, 'water');
+  paintRect(tiles, w, h, 100, 72, 111, 83, 'water');
   ensureBasePads();
-  paintRect(tiles, w, h, 28, 24, 43, 28, 'concrete');
-  paintRect(tiles, w, h, 25, 15, 28, 19, 'ridge');
-  paintRect(tiles, w, h, 43, 33, 46, 37, 'ridge');
+  paintRect(tiles, w, h, 42, 37, 68, 43, 'concrete');
+  paintRect(tiles, w, h, 36, 22, 41, 28, 'ridge');
+  paintRect(tiles, w, h, 68, 52, 73, 58, 'ridge');
 
   return {
     map: { id: 'fab_corridor', name: meta.name, biome: meta.biome, width: w, height: h, tileSize: TILE_SIZE, tiles },
     siliconNodes: [
-      { tileX: 7, tileY: 32, amount: 9500 },
-      { tileX: 62, tileY: 20, amount: 9500 },
-      { tileX: 32, tileY: 11, amount: 12000 },
-      { tileX: 38, tileY: 40, amount: 12000 },
-      { tileX: 21, tileY: 24, amount: 11000 },
-      { tileX: 49, tileY: 27, amount: 11000 },
+      { tileX: 9, tileY: 56, amount: 11000 },
+      { tileX: 23, tileY: 74, amount: 10500 },
+      { tileX: 98, tileY: 26, amount: 11000 },
+      { tileX: 85, tileY: 8, amount: 10500 },
+      { tileX: 48, tileY: 16, amount: 14000 },
+      { tileX: 60, tileY: 64, amount: 14000 },
+      { tileX: 32, tileY: 38, amount: 13000 },
+      { tileX: 76, tileY: 42, amount: 13000 },
     ],
     neutralBuildings: [
-      { defId: 'lng_terminal', tileX: 23, tileY: 44 },
-      { defId: 'lng_terminal', tileX: 46, tileY: 7 },
-      { defId: 'fiber_station', tileX: 35, tileY: 3 },
+      { defId: 'lng_terminal', tileX: 30, tileY: 70 },
+      { defId: 'lng_terminal', tileX: 78, tileY: 11 },
+      { defId: 'fiber_station', tileX: 54, tileY: 5 },
+      { defId: 'fiber_station', tileX: 54, tileY: 75 },
+      { defId: 'analog_radar', tileX: 54, tileY: 39 },
     ],
     p1Spawn,
     aiSpawn,

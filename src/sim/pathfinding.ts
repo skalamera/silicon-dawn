@@ -129,7 +129,7 @@ export function findPath(
   ];
 
   let iterations = 0;
-  const maxIter = 2400;
+  const maxIter = 6500;
 
   while (openList.length > 0 && iterations < maxIter) {
     iterations++;

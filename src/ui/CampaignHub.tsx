@@ -10,6 +10,7 @@ import {
   Play,
   RotateCcw,
   Shield,
+  Star,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ import { HomeBackdrop } from './HomeBackdrop';
 
 interface CampaignHubProps {
   completedIds: Set<string>;
+  bonusIds: Set<string>;
   saveSlots: SaveSlotMeta[];
   heroImageSrc?: string;
   onBackToHome: () => void;
@@ -44,6 +46,7 @@ function formatDuration(sec: number): string {
 
 export function CampaignHub({
   completedIds,
+  bonusIds,
   saveSlots,
   heroImageSrc,
   onBackToHome,
@@ -197,6 +200,7 @@ export function CampaignHub({
               <div className="sm:col-span-5 border-b sm:border-b-0 sm:border-r border-slate-800 p-2 space-y-1.5 max-h-[28rem] overflow-y-auto tactical-scroll">
                 {MISSIONS.map((m) => {
                   const done = completedIds.has(m.id);
+                  const hasBonus = bonusIds.has(m.id);
                   const isNext = m.id === firstPending.id && !done;
                   const isSelected = m.id === active.id;
                   const factionBadge =
@@ -219,16 +223,24 @@ export function CampaignHub({
                     >
                       <div className="flex items-center justify-between gap-1.5">
                         <span className={`font-mono font-bold ${factionBadge}`}>{m.codeName}</span>
-                        {done ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-300">
-                            <CheckCircle2 className="h-3 w-3" />
-                            CLEARED
-                          </span>
-                        ) : isNext ? (
-                          <span className="rounded bg-amber-400/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300">
-                            NEXT OP
-                          </span>
-                        ) : null}
+                        <div className="flex items-center gap-1">
+                          {hasBonus && (
+                            <Star
+                              aria-label="Bonus Medal Earned"
+                              className="h-3.5 w-3.5 text-amber-300 fill-amber-300"
+                            />
+                          )}
+                          {done ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-300">
+                              <CheckCircle2 className="h-3 w-3" />
+                              CLEARED
+                            </span>
+                          ) : isNext ? (
+                            <span className="rounded bg-amber-400/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300">
+                              NEXT OP
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="font-semibold text-slate-100 mt-1">{m.title}</div>
                       <div className="text-[11px] font-mono text-slate-400 mt-0.5 uppercase">
@@ -246,14 +258,26 @@ export function CampaignHub({
                     <span>
                       {active.codeName} // {active.faction.toUpperCase()}
                     </span>
-                    <span>THEATER: {active.mapId.replace('_', ' ').toUpperCase()}</span>
+                    <span>
+                      {active.mapId.replace('_', ' ').toUpperCase()} (112×84)
+                    </span>
                   </div>
 
-                  <h2 className="text-lg font-black text-slate-100">{active.title}</h2>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-lg font-black text-slate-100">{active.title}</h2>
+                    <span className="rounded border border-emerald-400/40 bg-emerald-950/50 px-2 py-0.5 font-mono text-[11px] text-emerald-300">
+                      {active.graceWindowLabel}
+                    </span>
+                  </div>
 
                   <p className="rounded border border-slate-800 bg-slate-900/75 p-3 text-slate-300 leading-relaxed font-mono">
                     {active.briefing}
                   </p>
+
+                  <div className="rounded border border-sky-500/30 bg-sky-950/25 px-3 py-2 text-sky-200">
+                    <strong className="font-mono uppercase text-[11px] text-sky-300">Intel: </strong>
+                    <span>{active.intelNote}</span>
+                  </div>
 
                   <div className="space-y-1.5">
                     <div className="font-mono text-slate-400 uppercase">Primary Objectives</div>
@@ -265,6 +289,17 @@ export function CampaignHub({
                         </li>
                       ))}
                     </ul>
+                    <div className="flex items-start gap-2 pt-1 text-amber-200">
+                      <Star
+                        className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${
+                          bonusIds.has(active.id) ? 'fill-amber-300 text-amber-300' : 'text-amber-400'
+                        }`}
+                      />
+                      <span>
+                        {active.bonusObjective.label}
+                        {bonusIds.has(active.id) ? ' (MEDAL EARNED)' : ''}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

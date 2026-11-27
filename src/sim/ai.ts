@@ -117,10 +117,14 @@ export function updateAiCommander(
       }
     }
 
-    // 3. Use Cyber Powers & Launch Waves
+    // 3. Use Cyber Powers (only after early-game defense build window) & Launch Graduated Waves
     const enemyId = getOpponentId(pid);
     const enemyBuildings = getPlayerBuildings(state, enemyId);
-    if (hasBuildingDef(state, pid, 'cryo_core') && enemyBuildings.length > 0) {
+    if (
+      state.elapsedSeconds >= 240 &&
+      hasBuildingDef(state, pid, 'cryo_core') &&
+      enemyBuildings.length > 0
+    ) {
       if (ai.cyberCooldowns.ransomware <= 0 && ai.aiDifficulty === 'commander') {
         dispatch(state, { type: 'useCyberPower', playerId: pid, powerId: 'ransomware', x: 0, y: 0 });
       } else if (ai.cyberCooldowns.data_poison <= 0) {
@@ -136,9 +140,9 @@ export function updateAiCommander(
     }
 
     if (ai.aiWaveTimer <= 0) {
-      ai.aiWaveTimer = ai.aiDifficulty === 'commander' ? 40 : 52;
-      // Give Boot Sequence tutorial players a peaceful 4-minute build window
-      if (state.missionId === 'boot_sequence' && state.elapsedSeconds < 240) {
+      ai.aiWaveTimer = ai.aiDifficulty === 'commander' ? 75 : 105;
+      // Give Boot Sequence tutorial players a peaceful 6-minute build window
+      if (state.missionId === 'boot_sequence' && state.elapsedSeconds < 360) {
         continue;
       }
       const combatIds: string[] = [];
@@ -157,6 +161,14 @@ export function updateAiCommander(
 
       const minWave = ai.aiDifficulty === 'commander' ? 4 : 6;
       if (combatIds.length >= minWave && enemyBuildings.length > 0) {
+        // Graduated escalation: early probe -> mid escalation -> late full assault
+        const waveSlice =
+          state.elapsedSeconds < 340
+            ? combatIds.slice(0, 3)
+            : state.elapsedSeconds < 520
+            ? combatIds.slice(0, Math.max(5, Math.ceil(combatIds.length * 0.6)))
+            : combatIds;
+
         // AI gets fooled by Deepfake Spoof Blips or Decoy Batteries if present!
         const decoy = enemyBuildings.find((b) => b.defId === 'decoy_battery');
         const spoof = state.spoofBlips.find((s) => s.ownerId === enemyId);
@@ -169,7 +181,7 @@ export function updateAiCommander(
         dispatch(state, {
           type: 'moveUnits',
           playerId: pid,
-          unitIds: combatIds,
+          unitIds: waveSlice,
           x: target.x,
           y: target.y,
           attackMove: true,

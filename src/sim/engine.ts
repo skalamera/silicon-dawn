@@ -14,6 +14,7 @@ import {
   updateAbilitiesAndSuperweapons,
 } from './abilities';
 import { updateAiCommander } from './ai';
+import { updateCampaignEvents } from './campaignEvents';
 import { updateCombatAndMovement, updateFogOfWar } from './combat';
 import { updateGridAndEconomy } from './economy';
 import { hasBuildingDef, nextId, pushAlert, spawnBuilding, spawnUnit } from './helpers';
@@ -57,7 +58,7 @@ function createPlayer(
     unitQueue: [],
     rallyPoint: null,
     aiTimer: 2.0,
-    aiWaveTimer: difficulty === 'commander' ? 95 : 135,
+    aiWaveTimer: difficulty === 'commander' ? 210 : 300,
     defeated: false,
     qDayProgress: 0,
     qDayActive: false,
@@ -516,6 +517,7 @@ export function stepSimulation(state: GameState): void {
 
   updateAbilitiesAndSuperweapons(state, dt);
   updateGridAndEconomy(state, dt);
+  updateCampaignEvents(state);
   updateAiCommander(state, dt, dispatchCommand);
   updateCombatAndMovement(state, dt);
 

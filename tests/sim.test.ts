@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BRIEFING_CUTSCENES, getVictoryCutscene } from '../src/data/cutscenes';
 import { MISSIONS } from '../src/data/missions';
@@ -332,9 +334,9 @@ describe('Silicon Dawn full 3-faction simulation, EW, Cyber & Superweapons', () 
     expect(cloud.kind).toBe('cloud');
   });
 
-  it('uses expanded 72x54 maps, initial wave grace timer, FMV scripts, and 6-chapter Showcase Demo', () => {
-    expect(MAP_WIDTH).toBe(72);
-    expect(MAP_HEIGHT).toBe(54);
+  it('uses expanded 112x84 maps, extended wave grace timer, deeper campaign, FMV voiceovers, and 6-chapter Showcase Demo', () => {
+    expect(MAP_WIDTH).toBe(112);
+    expect(MAP_HEIGHT).toBe(84);
     for (const m of MAP_CATALOG) {
       const mapState = createInitialState({ ...BASE_CONFIG, mapId: m.id });
       expect(mapState.map.width).toBe(MAP_WIDTH);
@@ -342,23 +344,66 @@ describe('Silicon Dawn full 3-faction simulation, EW, Cyber & Superweapons', () 
     }
 
     const skirmish = createInitialState(BASE_CONFIG);
-    expect(skirmish.players.ai1.aiWaveTimer).toBeGreaterThanOrEqual(95);
+    expect(skirmish.players.ai1.aiWaveTimer).toBeGreaterThanOrEqual(210);
 
     const boot = createInitialState({
       ...BASE_CONFIG,
       aiDifficulty: 'recruit',
       missionId: 'boot_sequence',
     });
-    expect(boot.players.ai1.aiWaveTimer).toBeGreaterThanOrEqual(135);
+    expect(boot.players.ai1.aiWaveTimer).toBeGreaterThanOrEqual(300);
 
-    // Every mission has an FMV briefing script + victory debrief generator works for all factions
+    // Every mission has structured live objectiveDefs, bonusObjective, and FMV narrator audio
+    const publicRoot = path.resolve(process.cwd(), 'public');
     for (const mission of MISSIONS) {
-      expect(BRIEFING_CUTSCENES[mission.id]).toBeDefined();
-      expect(BRIEFING_CUTSCENES[mission.id].beats.length).toBeGreaterThanOrEqual(2);
+      expect(mission.objectiveDefs.length).toBeGreaterThanOrEqual(2);
+      expect(mission.bonusObjective.label.length).toBeGreaterThan(5);
+      const cutscene = BRIEFING_CUTSCENES[mission.id];
+      expect(cutscene).toBeDefined();
+      expect(cutscene.beats.length).toBeGreaterThanOrEqual(2);
+      for (const beat of cutscene.beats) {
+        expect(beat.audioUrl).toMatch(/^\/assets\/voice\/cutscene_.*\.mp3$/);
+        const mp3Path = path.join(publicRoot, beat.audioUrl!.slice(1));
+        expect(fs.existsSync(mp3Path)).toBe(true);
+        expect(fs.statSync(mp3Path).size).toBeGreaterThan(1024);
+      }
     }
-    expect(getVictoryCutscene('alliance', 'Test Op').beats.length).toBeGreaterThan(0);
-    expect(getVictoryCutscene('pact', 'Test Op').beats.length).toBeGreaterThan(0);
-    expect(getVictoryCutscene('axis', 'Test Op').beats.length).toBeGreaterThan(0);
+
+    for (const f of ['alliance', 'pact', 'axis'] as const) {
+      const vc = getVictoryCutscene(f, 'Test Op');
+      expect(vc.beats.length).toBeGreaterThan(0);
+      for (const beat of vc.beats) {
+        expect(beat.audioUrl).toMatch(/^\/assets\/voice\/cutscene_victory_.*\.mp3$/);
+        const mp3Path = path.join(publicRoot, beat.audioUrl!.slice(1));
+        expect(fs.existsSync(mp3Path)).toBe(true);
+        expect(fs.statSync(mp3Path).size).toBeGreaterThan(1024);
+      }
+    }
+
+    const evaFiles = [
+      'eva_operation_active.mp3',
+      'eva_low_power.mp3',
+      'eva_thermal_meltdown.mp3',
+      'eva_construction_ready.mp3',
+      'eva_insufficient_silicon.mp3',
+      'eva_cannot_deploy.mp3',
+      'eva_server_destroyed.mp3',
+      'eva_qday_achieved.mp3',
+      'eva_superweapon_ready.mp3',
+      'eva_ransomware.mp3',
+      'eva_prometheus.mp3',
+      'eva_kessler.mp3',
+      'eva_chokepoint.mp3',
+      'eva_false_orders_req.mp3',
+      'eva_captured.mp3',
+      'eva_victory.mp3',
+      'eva_defeat.mp3',
+    ];
+    for (const file of evaFiles) {
+      const mp3Path = path.join(publicRoot, 'assets', 'voice', file);
+      expect(fs.existsSync(mp3Path)).toBe(true);
+      expect(fs.statSync(mp3Path).size).toBeGreaterThan(1024);
+    }
 
     // Demo sandbox runs all 6 showcase chapters cleanly without errors
     const demoState = createDemoState();

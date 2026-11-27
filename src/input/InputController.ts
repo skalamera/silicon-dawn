@@ -499,6 +499,14 @@ export class InputController {
           unitIds: Array.from(this.selectedIds),
         });
       }
+    } else if (e.code === 'KeyR') {
+      if (this.selectedIds.size > 0) {
+        this.cb.dispatch({
+          type: 'toggleRepair',
+          playerId: 'p1',
+          entityIds: Array.from(this.selectedIds),
+        });
+      }
     } else if (e.code === 'Escape') {
       const state = this.cb.getState();
       if (this.cb.getArmedTargeting()) {

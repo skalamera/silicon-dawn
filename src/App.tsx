@@ -452,7 +452,11 @@ export function App() {
       for (const al of st.alerts) {
         if (!seen.has(al.id)) {
           seen.add(al.id);
-          soundEngine.playAlertChime(al.tone === 'danger');
+          if (al.text.includes('UNIT PROMOTED')) {
+            soundEngine.playPromotion();
+          } else {
+            soundEngine.playAlertChime(al.tone === 'danger');
+          }
           if (al.tone !== 'info' || al.text.includes('Q-DAY') || al.text.includes('ready')) {
             soundEngine.speakEva(al.text);
           }

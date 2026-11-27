@@ -1,6 +1,6 @@
 import { BUILDING_DEFS, UNIT_DEFS, type BuildingId, type UnitId } from '../data/defs';
 import { launchSwarmFromUnit } from './abilities';
-import { nextId, pushAlert } from './helpers';
+import { getVeterancyLabel, nextId, pushAlert } from './helpers';
 import { computeSeparation, findPath, type PathMode } from './pathfinding';
 import { nextFloat } from './prng';
 import type { Entity, GameState, SmokeCloud } from './types';
@@ -44,14 +44,17 @@ function getEntityStats(ent: Entity): {
   aoeRadius: number;
   tags: string[];
 } {
-  const vetMult = ent.veterancy === 2 ? 1.3 : ent.veterancy === 1 ? 1.15 : 1.0;
+  const vetDmgMult =
+    ent.veterancy === 3 ? 1.5 : ent.veterancy === 2 ? 1.3 : ent.veterancy === 1 ? 1.15 : 1.0;
+  const vetRateMult =
+    ent.veterancy === 3 ? 0.68 : ent.veterancy === 2 ? 0.8 : ent.veterancy === 1 ? 0.9 : 1.0;
   if (ent.kind === 'building') {
     const d = BUILDING_DEFS[ent.defId as BuildingId];
     return {
       sight: d.sightRange,
       range: d.attackRange,
-      damage: d.damage * vetMult,
-      fireInterval: d.fireInterval,
+      damage: d.damage * vetDmgMult,
+      fireInterval: d.fireInterval * vetRateMult,
       weaponType: d.weaponType,
       projSpeed: d.weaponType === 'missile' ? 460 : 0,
       isRocket: d.weaponType === 'missile',
@@ -63,8 +66,8 @@ function getEntityStats(ent: Entity): {
   return {
     sight: d.sightRange,
     range: d.attackRange,
-    damage: d.damage * vetMult,
-    fireInterval: d.fireInterval,
+    damage: d.damage * vetDmgMult,
+    fireInterval: d.fireInterval * vetRateMult,
     weaponType: d.weaponType,
     projSpeed: d.projectileSpeed,
     isRocket: Boolean(d.isRocket),
@@ -101,18 +104,56 @@ function applyDamage(
     target.burrowed = false;
   }
 
+  const wasAlive = target.hp > 0;
   target.hp -= finalDmg;
-  if (target.hp <= 0 && attackerId && state.entities[attackerId]) {
+  if (wasAlive && target.hp <= 0 && attackerId && state.entities[attackerId]) {
     const atk = state.entities[attackerId];
+    if (atk.ownerId === target.ownerId) return;
+
     atk.kills += 1;
-    if (atk.kills >= 5 && atk.veterancy < 2) {
-      atk.veterancy = 2;
-      atk.maxHp = Math.round(atk.maxHp * 1.12);
-      atk.hp = Math.min(atk.maxHp, atk.hp + 60);
-    } else if (atk.kills >= 2 && atk.veterancy < 1) {
-      atk.veterancy = 1;
-      atk.maxHp = Math.round(atk.maxHp * 1.12);
-      atk.hp = Math.min(atk.maxHp, atk.hp + 40);
+    const xpGain =
+      target.kind === 'building'
+        ? 2
+        : (UNIT_DEFS[target.defId as UnitId]?.cost ?? 0) >= 650
+        ? 2
+        : 1;
+    atk.xp = (atk.xp ?? 0) + xpGain;
+
+    const nextRank: 0 | 1 | 2 | 3 =
+      atk.xp >= 9 ? 3 : atk.xp >= 5 ? 2 : atk.xp >= 2 ? 1 : 0;
+
+    if (nextRank > atk.veterancy) {
+      const baseHp =
+        atk.kind === 'building'
+          ? BUILDING_DEFS[atk.defId as BuildingId].hp
+          : UNIT_DEFS[atk.defId as UnitId].hp;
+      const hpMult = nextRank === 3 ? 1.5 : nextRank === 2 ? 1.3 : 1.15;
+      const healPct = nextRank === 3 ? 0.5 : nextRank === 2 ? 0.35 : 0.25;
+      atk.maxHp = Math.round(baseHp * hpMult);
+      atk.hp = Math.min(atk.maxHp, atk.hp + Math.round(atk.maxHp * healPct));
+      atk.veterancy = nextRank;
+
+      state.explosions.push({
+        id: nextId(state, 'promo'),
+        x: atk.x,
+        y: atk.y,
+        radius: 34,
+        color: '#facc15',
+        life: 0.55,
+        maxLife: 0.55,
+      });
+
+      if (atk.ownerId === 'p1') {
+        const shortName =
+          atk.kind === 'building'
+            ? BUILDING_DEFS[atk.defId as BuildingId].shortName
+            : UNIT_DEFS[atk.defId as UnitId].shortName;
+        pushAlert(
+          state,
+          `UNIT PROMOTED: ${shortName} reached ${getVeterancyLabel(nextRank)} (${'★'.repeat(nextRank)})!`,
+          'info'
+        );
+      }
     }
   }
 }
@@ -296,7 +337,8 @@ export function updateCombatAndMovement(state: GameState, dt: number): void {
         const ocMult = uDef.tags.includes('AUTONOMOUS') && p?.overclock ? 1.35 : 1.0;
         const jamMult = ent.jammed ? 0.65 : 1.0;
         const slowMult = ent.slowTimer > 0 ? 0.6 : 1.0;
-        const spd = uDef.speed * latMult * ocMult * jamMult * slowMult;
+        const vetSpdMult = ent.veterancy === 3 ? 1.15 : ent.veterancy === 2 ? 1.1 : 1.0;
+        const spd = uDef.speed * latMult * ocMult * jamMult * slowMult * vetSpdMult;
 
         const sep = isAir ? { sx: 0, sy: 0 } : computeSeparation(state, ent);
         const norm = Math.max(1, Math.hypot(dx, dy));
@@ -342,6 +384,90 @@ export function updateCombatAndMovement(state: GameState, dt: number): void {
             }
             break;
           }
+        }
+      }
+    }
+  }
+
+  // 3b. Active Manual Repairs, Service Bay Auto-Repair & Heroic Self-Repair
+  const serviceBaysByOwner: Record<string, Entity[]> = {};
+  for (const id of state.entityOrder) {
+    const b = state.entities[id];
+    if (
+      b &&
+      b.kind === 'building' &&
+      b.ownerId !== 'neutral' &&
+      b.hp > 0 &&
+      (b.defId === 'conyard' || b.defId === 'war_factory' || b.defId === 'naval_dock')
+    ) {
+      (serviceBaysByOwner[b.ownerId] ??= []).push(b);
+    }
+  }
+
+  for (const id of state.entityOrder) {
+    const ent = state.entities[id];
+    if (!ent || ent.ownerId === 'neutral' || ent.hp <= 0 || ent.defId === 'silicon_node') continue;
+    const owner = state.players[ent.ownerId];
+    if (!owner) continue;
+
+    // Heroic (★★★) passive field self-repair (free)
+    if (ent.veterancy === 3 && ent.hp < ent.maxHp) {
+      ent.hp = Math.min(ent.maxHp, ent.hp + 10 * dt);
+      ent.repairing = true;
+    }
+
+    // Manual repair command toggle (works on both buildings and units)
+    if (ent.manualRepair) {
+      if (ent.hp >= ent.maxHp) {
+        ent.manualRepair = false;
+      } else if (owner.silicon > 0.2) {
+        const rate =
+          ent.kind === 'building' ? 30 : ent.path.length === 0 ? 20 : 10;
+        const costPerHp = ent.kind === 'building' ? 0.22 : 0.25;
+        const heal = Math.min(ent.maxHp - ent.hp, rate * dt, owner.silicon / costPerHp);
+        if (heal > 0) {
+          ent.hp = Math.min(ent.maxHp, ent.hp + heal);
+          owner.silicon = Math.max(0, owner.silicon - heal * costPerHp);
+          ent.repairing = true;
+        }
+        if (ent.hp >= ent.maxHp || owner.silicon <= 0.2) {
+          ent.manualRepair = false;
+        }
+      } else {
+        ent.manualRepair = false;
+      }
+    }
+
+    // Automatic War Factory / Naval Dock / ConYard Service Bay proximity repair
+    if (ent.kind === 'unit' && ent.hp < ent.maxHp && !ent.manualRepair && owner.silicon > 0.2) {
+      const uDef = UNIT_DEFS[ent.defId as UnitId];
+      const isNaval = uDef.tags.includes('NAVAL');
+      const bays = serviceBaysByOwner[ent.ownerId] ?? [];
+      for (const bay of bays) {
+        if (isNaval && bay.defId === 'war_factory') continue;
+        if (!isNaval && bay.defId === 'naval_dock') continue;
+        if (Math.hypot(ent.x - bay.x, ent.y - bay.y) <= 180) {
+          const heal = Math.min(ent.maxHp - ent.hp, 28 * dt, owner.silicon / 0.14);
+          if (heal > 0) {
+            ent.hp = Math.min(ent.maxHp, ent.hp + heal);
+            owner.silicon = Math.max(0, owner.silicon - heal * 0.14);
+            ent.repairing = true;
+            if (state.tick % 6 === 0) {
+              state.beams.push({
+                id: nextId(state, 'svcweld'),
+                ownerId: ent.ownerId,
+                x1: bay.x,
+                y1: bay.y - 6,
+                x2: ent.x,
+                y2: ent.y - 4,
+                scatteredBySmoke: false,
+                kind: 'weld',
+                life: 0.22,
+                maxLife: 0.22,
+              });
+            }
+          }
+          break;
         }
       }
     }

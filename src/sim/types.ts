@@ -101,7 +101,9 @@ export interface Entity {
   hp: number;
   maxHp: number;
   kills: number;
-  veterancy: 0 | 1 | 2;
+  veterancy: 0 | 1 | 2 | 3;
+  xp?: number;
+  manualRepair?: boolean;
   cooldown: number;
   apsCooldown: number;
   smokeCooldown: number;
@@ -296,4 +298,5 @@ export type SimCommand =
   | { type: 'payRansom'; playerId: string }
   | { type: 'fireSuperweapon'; playerId: string; x: number; y: number }
   | { type: 'setRallyPoint'; playerId: string; x: number; y: number }
-  | { type: 'sellBuilding'; playerId: string; buildingId: string };
+  | { type: 'sellBuilding'; playerId: string; buildingId: string }
+  | { type: 'toggleRepair'; playerId: string; entityIds: string[] };

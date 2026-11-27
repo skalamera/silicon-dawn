@@ -181,6 +181,24 @@ class SoundEngine {
     osc.stop(t + 0.16);
   }
 
+  public playPromotion(): void {
+    if (!this.canPlay('promo', 350) || !this.ctx) return;
+    const notes = [523.25, 659.25, 783.99];
+    const now = this.ctx.currentTime;
+    for (let i = 0; i < notes.length; i++) {
+      const start = now + i * 0.085;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(notes[i], start);
+      gain.gain.setValueAtTime(0.08, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+      osc.connect(gain).connect(this.ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.23);
+    }
+  }
+
   public playHpm(): void {
     if (!this.canPlay('hpm', 220) || !this.ctx) return;
     const t = this.ctx.currentTime;

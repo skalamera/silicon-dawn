@@ -436,4 +436,60 @@ describe('Silicon Dawn full 3-faction simulation, EW, Cyber & Superweapons', () 
     expect(metaCheck.missionId).toBe('flashpoint_01');
     expect(resetCampaignProgress().size).toBe(0);
   });
+
+  it('supports manual & Service Bay repairs for units/buildings and 3-tier combat promotions', () => {
+    const s = createInitialState(BASE_CONFIG);
+    const farm = spawnBuilding(s, 'p1', 'server_farm', 16, 70);
+    farm.hp = Math.round(farm.maxHp * 0.5);
+    const siBefore = s.players.p1.silicon;
+
+    // 1. Manual building repair restores HP, spends Silicon, and auto-clears at full HP
+    dispatchCommand(s, { type: 'toggleRepair', playerId: 'p1', entityIds: [farm.id] });
+    expect(farm.manualRepair).toBe(true);
+    for (let i = 0; i < 40; i++) stepSimulation(s);
+    expect(farm.hp).toBeGreaterThan(Math.round(farm.maxHp * 0.5));
+    expect(farm.repairing).toBe(true);
+    expect(s.players.p1.silicon).toBeLessThan(siBefore);
+
+    // 2. Service Bay proximity auto-repairs damaged friendly unit near War Factory
+    const factory = spawnBuilding(s, 'p1', 'war_factory', 18, 66);
+    const damagedTank = spawnUnit(s, 'p1', 'm1e4', factory.x + 60, factory.y + 40);
+    damagedTank.hp = 180;
+    for (let i = 0; i < 30; i++) stepSimulation(s);
+    expect(damagedTank.hp).toBeGreaterThan(180);
+    expect(damagedTank.repairing).toBe(true);
+
+    // 3. Defeating enemy units/buildings promotes through Veteran -> Elite -> Heroic + Heroic self-repair
+    const heroTank = spawnUnit(s, 'p1', 'm1e4', 2400, 1800);
+    const baseMaxHp = heroTank.maxHp;
+    for (let i = 0; i < 5; i++) {
+      const targetTank = spawnUnit(s, 'ai1', 'type_99x', 2500, 1800);
+      targetTank.hp = 10;
+      dispatchCommand(s, {
+        type: 'attackEntity',
+        playerId: 'p1',
+        unitIds: [heroTank.id],
+        targetId: targetTank.id,
+      });
+      for (let t = 0; t < 35; t++) {
+        if (!s.entities[targetTank.id]) break;
+        stepSimulation(s);
+      }
+    }
+    expect(heroTank.kills).toBe(5);
+    expect(heroTank.xp).toBe(10); // 5 x heavy unit (cost >= 650) = 10 XP -> Heroic
+    expect(heroTank.veterancy).toBe(3);
+    expect(heroTank.maxHp).toBeGreaterThan(baseMaxHp);
+    expect(s.alerts.some((a) => a.text.includes('UNIT PROMOTED') && a.text.includes('Heroic'))).toBe(
+      true
+    );
+
+    // Heroic self-repair regenerates HP for free even with 0 Silicon
+    s.players.p1.silicon = 0;
+    heroTank.manualRepair = false;
+    heroTank.hp = heroTank.maxHp - 120;
+    const preRegen = heroTank.hp;
+    for (let i = 0; i < 20; i++) stepSimulation(s);
+    expect(heroTank.hp).toBeGreaterThan(preRegen);
+  });
 });

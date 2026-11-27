@@ -66,6 +66,8 @@ export function spawnBuilding(
     maxHp: def.hp,
     kills: 0,
     veterancy: 0,
+    xp: 0,
+    manualRepair: false,
     cooldown: 0,
     apsCooldown: 0,
     smokeCooldown: 0,
@@ -123,6 +125,8 @@ export function spawnUnit(
     maxHp: def.hp,
     kills: 0,
     veterancy: 0,
+    xp: 0,
+    manualRepair: false,
     cooldown: 0,
     apsCooldown: 0,
     smokeCooldown: 0,
@@ -180,4 +184,11 @@ export function computeLatencyFactor(flopsUsed: number, flopsCap: number): numbe
 
 export function getOpponentId(playerId: string): string {
   return playerId === 'p1' ? 'ai1' : 'p1';
+}
+
+export function getVeterancyLabel(rank: 0 | 1 | 2 | 3): string {
+  if (rank === 3) return 'Heroic';
+  if (rank === 2) return 'Elite';
+  if (rank === 1) return 'Veteran';
+  return 'Rookie';
 }

@@ -506,6 +506,33 @@ export function dispatchCommand(state: GameState, cmd: SimCommand): void {
       state.entityOrder = state.entityOrder.filter((id) => id !== b.id);
       return;
     }
+
+    case 'toggleRepair': {
+      const damaged = cmd.entityIds
+        .map((id) => state.entities[id])
+        .filter(
+          (e) =>
+            e &&
+            e.ownerId === cmd.playerId &&
+            e.defId !== 'silicon_node' &&
+            e.hp > 0 &&
+            e.hp < e.maxHp
+        );
+      if (damaged.length === 0) return;
+      const allActive = damaged.every((e) => Boolean(e.manualRepair));
+      if (allActive) {
+        for (const e of damaged) e.manualRepair = false;
+        return;
+      }
+      if (player.silicon < 2) {
+        if (cmd.playerId === 'p1') {
+          pushAlert(state, 'Insufficient Silicon reserves.', 'warn');
+        }
+        return;
+      }
+      for (const e of damaged) e.manualRepair = true;
+      return;
+    }
   }
 }
 

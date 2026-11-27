@@ -21,6 +21,7 @@ import type { Entity, GameState, SimCommand } from '../sim/types';
 import {
   ArrowDownUp,
   Crosshair,
+  DollarSign,
   Flame,
   Layers,
   LockKeyhole,
@@ -30,8 +31,11 @@ import {
   Rocket,
   ShieldAlert,
   SquareDashedMousePointer,
+  Star,
   Wind,
+  Wrench,
 } from 'lucide-react';
+import { getVeterancyLabel } from '../sim/helpers';
 import { UnitIcon } from './UnitIcon';
 
 interface CommandSidebarProps {
@@ -98,6 +102,26 @@ export function CommandSidebar({
   const selectedEntities: Entity[] = Array.from(selectedIds)
     .map((id) => state.entities[id])
     .filter((e): e is Entity => Boolean(e && e.ownerId === 'p1'));
+  const damagedSelected = selectedEntities.filter(
+    (e) => e.defId !== 'silicon_node' && e.hp > 0 && e.hp < e.maxHp
+  );
+  const anyManualRepairing = damagedSelected.some((e) => Boolean(e.manualRepair));
+  const singleSelected = selectedEntities.length === 1 ? selectedEntities[0] : null;
+  const singleSellableBuilding =
+    singleSelected &&
+    singleSelected.kind === 'building' &&
+    !BUILDING_DEFS[singleSelected.defId as BuildingId]?.isNeutralCapture
+      ? singleSelected
+      : null;
+  const singleLabel = singleSelected
+    ? singleSelected.kind === 'building'
+      ? BUILDING_DEFS[singleSelected.defId as BuildingId].shortName
+      : UNIT_DEFS[singleSelected.defId as UnitId].shortName
+    : null;
+  const highestRank = selectedEntities.reduce<0 | 1 | 2 | 3>(
+    (best, e) => (e.veterancy > best ? e.veterancy : best),
+    0
+  );
   const hasSelectedMcv = selectedEntities.find((e) => e.defId === 'mcv');
   const hasSmokeCarrier = selectedEntities.some((e) => e.defId === 'smoke_carrier');
   const hasTunnelCrawler = selectedEntities.some((e) => e.defId === 'tunnel_crawler');
@@ -554,6 +578,94 @@ export function CommandSidebar({
               <SquareDashedMousePointer className="h-3.5 w-3.5" />
               Box Select
             </button>
+
+            {selectedEntities.length > 0 && (
+              <div className="col-span-2 rounded border border-slate-700/80 bg-slate-900/90 px-2.5 py-2 space-y-1.5">
+                {singleSelected ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-100 truncate">{singleLabel}</div>
+                      <div className="font-mono text-[11px] text-slate-300 tabular-nums">
+                        HP {Math.ceil(singleSelected.hp)}/{singleSelected.maxHp} · Kills{' '}
+                        {singleSelected.kills}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+                          singleSelected.veterancy === 3
+                            ? 'bg-amber-400/20 text-amber-200 border border-amber-400/50'
+                            : singleSelected.veterancy > 0
+                            ? 'bg-yellow-500/15 text-yellow-300'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {singleSelected.veterancy > 0 && <Star className="h-2.5 w-2.5 fill-current" />}
+                        {singleSelected.veterancy > 0 ? `${'★'.repeat(singleSelected.veterancy)} ` : ''}
+                        {getVeterancyLabel(singleSelected.veterancy)}
+                      </span>
+                      {singleSelected.repairing && (
+                        <span className="font-mono text-[10px] font-bold text-emerald-300">
+                          + REPAIRING
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-slate-200 font-semibold">
+                      {selectedEntities.length} Selected ({damagedSelected.length} damaged)
+                    </span>
+                    {highestRank > 0 && (
+                      <span className="text-amber-300 font-bold">
+                        Top: {'★'.repeat(highestRank)} {getVeterancyLabel(highestRank)}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {damagedSelected.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onDispatch({
+                        type: 'toggleRepair',
+                        playerId: 'p1',
+                        entityIds: damagedSelected.map((e) => e.id),
+                      })
+                    }
+                    className={`w-full flex items-center justify-center gap-1.5 rounded border py-1.5 font-bold transition ${
+                      anyManualRepairing
+                        ? 'border-emerald-300 bg-emerald-500 text-slate-950'
+                        : 'border-emerald-400/65 bg-emerald-950/75 text-emerald-200 hover:bg-emerald-900/75'
+                    }`}
+                  >
+                    <Wrench className="h-3.5 w-3.5" />
+                    <span>{anyManualRepairing ? 'Repairing... (R to Stop)' : 'Repair Selected (R)'}</span>
+                  </button>
+                )}
+
+                {singleSellableBuilding && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onDispatch({
+                        type: 'sellBuilding',
+                        playerId: 'p1',
+                        buildingId: singleSellableBuilding.id,
+                      })
+                    }
+                    className="w-full flex items-center justify-center gap-1 rounded border border-amber-500/45 bg-amber-950/50 py-1 font-semibold text-amber-200 hover:bg-amber-900/60 transition"
+                  >
+                    <DollarSign className="h-3 w-3" />
+                    <span>
+                      Sell Structure (+
+                      {Math.round(BUILDING_DEFS[singleSellableBuilding.defId as BuildingId].cost * 0.5)} Si)
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {hasSelectedMcv && (
               <button

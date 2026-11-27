@@ -1,6 +1,16 @@
 import { UNIT_DEFS, type UnitId } from '../data/defs';
 import type { Entity, GameState, SimCommand } from '../sim/types';
-import { ArrowDownUp, Crosshair, Layers, Navigation, OctagonX, Rocket, Wind, X } from 'lucide-react';
+import {
+  ArrowDownUp,
+  Crosshair,
+  Layers,
+  Navigation,
+  OctagonX,
+  Rocket,
+  Wind,
+  Wrench,
+  X,
+} from 'lucide-react';
 
 export interface RadialMenuTarget {
   sx: number;
@@ -37,6 +47,7 @@ export function RadialMenu({
   const hasSmoke = selectedUnits.some((u) => UNIT_DEFS[u.defId as UnitId].canDeploySmoke);
   const hasBurrow = selectedUnits.some((u) => UNIT_DEFS[u.defId as UnitId].canBurrow);
   const hasSwarm = selectedUnits.some((u) => UNIT_DEFS[u.defId as UnitId].canLaunchSwarm);
+  const hasDamaged = selectedUnits.some((u) => u.hp < u.maxHp);
 
   const vw = typeof window !== 'undefined' ? window.innerWidth : 800;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 600;
@@ -161,6 +172,19 @@ export function RadialMenu({
           >
             <Rocket className="h-3.5 w-3.5" />
             Swarm
+          </button>
+        )}
+        {!mcv && !hasSmoke && !hasBurrow && !hasSwarm && hasDamaged && (
+          <button
+            type="button"
+            onClick={() => {
+              onDispatch({ type: 'toggleRepair', playerId: 'p1', entityIds: unitIds });
+              onClose();
+            }}
+            className="pointer-events-auto absolute left-1/2 bottom-0 -translate-x-1/2 h-11 min-w-[88px] rounded-full border border-emerald-400/80 bg-emerald-950/95 px-3 text-xs font-bold text-emerald-200 flex items-center justify-center gap-1 shadow-lg"
+          >
+            <Wrench className="h-3.5 w-3.5" />
+            Repair
           </button>
         )}
       </div>

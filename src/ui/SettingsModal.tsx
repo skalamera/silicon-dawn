@@ -153,6 +153,7 @@ export function SettingsModal({
               <li>R-Click: Move / Attack / Capture</li>
               <li>WASD / Arrows / Wheel: Pan &amp; Zoom</li>
               <li>Tab: Cycle Tactical / EM / Grid</li>
+              <li>R: Repair selected units / buildings</li>
               <li>H or X: Stop selected units</li>
               <li>Space: Pause · F5/F9: Quick Save/Load</li>
               <li>Ctrl+1..4 / 1..4: Control Groups</li>

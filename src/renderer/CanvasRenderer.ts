@@ -915,8 +915,28 @@ export class CanvasRenderer {
       ctx.fillText('H2O +25%', cx, y0 + h + 10);
     }
 
+    if (ent.repairing) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(52, 211, 153, ${0.55 + Math.sin(animTime * 8) * 0.3})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(x0 - 2, y0 - depth * 0.5 - 2, w + 4, h + 4);
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('+', cx + Math.min(32, w * 0.5) + 7, y0 - depth * 0.5 - 5);
+      ctx.restore();
+    }
+
     if (selected || ent.hp < ent.maxHp) {
       this.drawHealthBar(ctx, cx, y0 - depth * 0.5 - 10, Math.min(64, w), ent.hp / ent.maxHp, pal.trim);
+    }
+
+    if (ent.veterancy > 0) {
+      ctx.fillStyle = ent.veterancy === 3 ? '#fb7185' : '#facc15';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('★'.repeat(ent.veterancy), cx, y0 - depth * 0.5 - 16);
     }
 
     ctx.restore();
@@ -967,6 +987,24 @@ export class CanvasRenderer {
     ctx.translate(ent.x, ent.y);
     if (def.tags.includes('STEALTH')) {
       ctx.globalAlpha = 0.72;
+    }
+
+    if (ent.veterancy === 3) {
+      ctx.strokeStyle = `rgba(250, 204, 21, ${0.5 + Math.sin(animTime * 6) * 0.25})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 2, isTank ? 23 : 16, isTank ? 17 : 12, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    if (ent.repairing) {
+      ctx.strokeStyle = `rgba(52, 211, 153, ${0.55 + Math.sin(animTime * 8) * 0.3})`;
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.ellipse(0, 2, isTank ? 21 : 14, isTank ? 15 : 10, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     if (selected) {
@@ -1149,11 +1187,20 @@ export class CanvasRenderer {
     if (selected || ent.hp < ent.maxHp) {
       this.drawHealthBar(ctx, 0, -16, 26, ent.hp / ent.maxHp, pal.trim);
     }
+    if (ent.repairing) {
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('+', 18, -11);
+    }
     if (ent.veterancy > 0) {
-      ctx.fillStyle = '#facc15';
+      const stars = '★'.repeat(ent.veterancy);
+      ctx.fillStyle = 'rgba(2, 6, 14, 0.72)';
+      ctx.fillRect(-14, 11, 28, 9);
+      ctx.fillStyle = ent.veterancy === 3 ? '#fde047' : '#facc15';
       ctx.font = 'bold 8px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(ent.veterancy === 2 ? '★★' : '★', 0, 18);
+      ctx.fillText(stars, 0, 18);
     }
 
     ctx.restore();

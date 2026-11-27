@@ -1,4 +1,4 @@
-const CACHE_NAME = 'silicon-dawn-v8';
+const CACHE_NAME = 'silicon-dawn-v9';
 const PRECACHE_URLS = ['/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

@@ -74,6 +74,24 @@ export function updateAiCommander(
           dispatch(state, { type: 'startBuildBuilding', playerId: pid, defId: desired });
         }
       }
+
+      // Repair damaged key AI structures on Commander difficulty
+      if (ai.aiDifficulty === 'commander' && ai.silicon >= 450) {
+        const damagedKey = buildings.find(
+          (b) =>
+            !b.manualRepair &&
+            b.hp < b.maxHp * 0.75 &&
+            (b.defId === 'conyard' ||
+              b.defId === 'war_factory' ||
+              b.defId === 'cryo_core' ||
+              b.defId === 'iron_beam' ||
+              b.defId === 'hpm_tower' ||
+              b.defId === 'popup_silo')
+        );
+        if (damagedKey) {
+          dispatch(state, { type: 'toggleRepair', playerId: pid, entityIds: [damagedKey.id] });
+        }
+      }
     }
 
     // 2. Queue Units for Alliance / Pact / Axis

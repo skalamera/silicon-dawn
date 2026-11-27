@@ -1,0 +1,18 @@
+{
+  "name": "Silicon Dawn",
+  "short_name": "Silicon Dawn",
+  "description": "2026 tactical RTS built around compute, autonomous warfare, power grids, and electronic spectrum dominance.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070c14",
+  "theme_color": "#0a1019",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

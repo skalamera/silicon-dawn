@@ -1,0 +1,9 @@
+# Dependencies & build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment & platform files
+.vercel
+.env*
+.DS_Store

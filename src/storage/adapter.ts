@@ -12,6 +12,8 @@ export interface SaveSlotMeta {
   tick: number;
   checksum: string;
   byteSize: number;
+  missionId?: string;
+  mapId?: string;
 }
 
 export interface SavedGameRecord {

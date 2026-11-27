@@ -21,3 +21,12 @@ export function markMissionCompleted(missionId: string): Set<string> {
   }
   return next;
 }
+
+export function resetCampaignProgress(): Set<string> {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore storage errors in private mode
+  }
+  return new Set();
+}

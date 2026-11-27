@@ -18,15 +18,20 @@ import {
   saveStorage,
   type SaveSlotMeta,
 } from './storage';
-import { getCompletedMissions, markMissionCompleted } from './storage/campaignProgress';
+import {
+  getCompletedMissions,
+  markMissionCompleted,
+  resetCampaignProgress,
+} from './storage/campaignProgress';
 import { loadUserSettings, saveUserSettings, type UserSettings } from './storage/settings';
-import { CampaignModal } from './ui/CampaignModal';
+import { CampaignHub } from './ui/CampaignHub';
 import { CommandSidebar } from './ui/CommandSidebar';
 import { CutsceneModal } from './ui/CutsceneModal';
 import { DemoHud } from './ui/DemoHud';
 import { HomeScreen } from './ui/HomeScreen';
 import { MissionTracker } from './ui/MissionTracker';
 import { NewMatchModal } from './ui/NewMatchModal';
+import { PauseMenuModal } from './ui/PauseMenuModal';
 import { RadialMenu, type RadialMenuTarget } from './ui/RadialMenu';
 import { SaveLoadModal } from './ui/SaveLoadModal';
 import { SettingsModal } from './ui/SettingsModal';
@@ -85,7 +90,7 @@ export function App() {
 
   const overlayRef = useRef<OverlayMode>('tactical');
   const speedRef = useRef<0 | 0.5 | 1 | 2>(0);
-  const screenModeRef = useRef<'home' | 'play'>('home');
+  const screenModeRef = useRef<'home' | 'campaign' | 'play'>('home');
   const selectedRef = useRef<Set<string>>(new Set());
   const boxSelectRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const hoverTileRef = useRef<{ tx: number; ty: number } | null>(null);
@@ -99,7 +104,7 @@ export function App() {
   const settingsRef = useRef<UserSettings>(loadUserSettings());
 
   const [hudState, setHudState] = useState<GameState>(() => stateRef.current);
-  const [screenMode, setScreenMode] = useState<'home' | 'play'>('home');
+  const [screenMode, setScreenMode] = useState<'home' | 'campaign' | 'play'>('home');
   const [hasActiveSession, setHasActiveSession] = useState(false);
   const [overlayMode, setOverlayMode] = useState<OverlayMode>('tactical');
   const [emVisited, setEmVisited] = useState(false);
@@ -110,7 +115,7 @@ export function App() {
   const [boxSelectMode, setBoxSelectMode] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [newMatchOpen, setNewMatchOpen] = useState(false);
-  const [campaignOpen, setCampaignOpen] = useState(false);
+  const [pauseMenuOpen, setPauseMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(() => settingsRef.current);
   const [radialMenu, setRadialMenu] = useState<RadialMenuTarget | null>(null);
@@ -172,25 +177,117 @@ export function App() {
     screenModeRef.current = 'play';
     setScreenMode('play');
     setHasActiveSession(true);
+    setPauseMenuOpen(false);
   }, []);
 
-  const returnToHome = useCallback(() => {
+  const openCampaignHub = useCallback(() => {
     speedRef.current = 0;
     setSimSpeed(0);
+    setPauseMenuOpen(false);
+    setWalkthroughActive(false);
+    screenModeRef.current = 'campaign';
+    setScreenMode('campaign');
+    void refreshSlots();
+  }, [refreshSlots]);
+
+  const openPauseMenu = useCallback(() => {
+    if (screenModeRef.current !== 'play') return;
+    if (typeof document !== 'undefined' && document.querySelector('dialog[open]')) return;
+    speedRef.current = 0;
+    setSimSpeed(0);
+    setPauseMenuOpen(true);
+  }, []);
+
+  const resumeFromPause = useCallback(() => {
+    setPauseMenuOpen(false);
+    if (screenModeRef.current === 'play' && !stateRef.current.winnerId && !activeCutscene) {
+      speedRef.current = 1;
+      setSimSpeed(1);
+    }
+  }, [activeCutscene]);
+
+  const quitToMenu = useCallback(() => {
+    speedRef.current = 0;
+    setSimSpeed(0);
+    setPauseMenuOpen(false);
+    setDemoActive(false);
+    setWalkthroughActive(false);
+    setActiveCutscene(null);
+    pendingMissionVoiceRef.current = null;
+    setHasActiveSession(false);
     screenModeRef.current = 'home';
     setScreenMode('home');
-    setWalkthroughActive(false);
+    inputRef.current?.setSelection([]);
   }, []);
+
+  const saveAndQuitToMenu = useCallback(async () => {
+    try {
+      const st = stateRef.current;
+      const mission = getMissionById(st.missionId);
+      const label = mission
+        ? `${mission.codeName} · ${mission.title}`
+        : `Skirmish · ${st.map.name}`;
+      const payload = serializeGameState(st);
+      await saveStorage.saveSlot(`manual-${Date.now()}`, label, 'manual', payload);
+      await refreshSlots();
+      quitToMenu();
+      showToast(`Saved "${label}"`);
+    } catch {
+      showToast('Save failed — IndexedDB unavailable');
+    }
+  }, [quitToMenu, refreshSlots, showToast]);
 
   const resumeActiveSession = useCallback(() => {
     soundEngine.unlock();
     screenModeRef.current = 'play';
     setScreenMode('play');
+    setPauseMenuOpen(false);
     if (!stateRef.current.winnerId && !activeCutscene) {
       speedRef.current = 1;
       setSimSpeed(1);
     }
   }, [activeCutscene]);
+
+  const handleLoadSlot = useCallback(
+    async (id: string) => {
+      const rec = await saveStorage.loadSlot(id);
+      if (!rec) return;
+      stateRef.current = deserializeGameState(rec.payload);
+      recordedWinRef.current = null;
+      setDemoActive(false);
+      setWalkthroughActive(false);
+      inputRef.current?.setSelection([]);
+      const cam = getConyardCenter(stateRef.current);
+      inputRef.current?.setCameraCenter(cam.x, cam.y, 0.9);
+      speedRef.current = 1;
+      setSimSpeed(1);
+      enterPlayMode();
+      setHudState({ ...stateRef.current });
+      setSaveModalOpen(false);
+      showToast(`Loaded "${rec.meta.name}"`);
+    },
+    [enterPlayMode, showToast]
+  );
+
+  const handleImportSaveFile = useCallback(
+    async (file: File) => {
+      const { state } = await importSaveFromFile(file);
+      stateRef.current = state;
+      recordedWinRef.current = null;
+      setDemoActive(false);
+      setWalkthroughActive(false);
+      inputRef.current?.setSelection([]);
+      const cam = getConyardCenter(stateRef.current);
+      inputRef.current?.setCameraCenter(cam.x, cam.y, 0.9);
+      speedRef.current = 1;
+      setSimSpeed(1);
+      enterPlayMode();
+      setHudState({ ...stateRef.current });
+      setSaveModalOpen(false);
+      showToast(`Imported ${file.name}`);
+    },
+    [enterPlayMode, showToast]
+  );
 
   const handleQuickLoad = useCallback(async () => {
     try {
@@ -297,7 +394,10 @@ export function App() {
         onOpenRadialMenu: (pos) => {
           setRadialMenu(pos);
         },
-        isBlocked: () => screenModeRef.current === 'home',
+        onOpenPauseMenu: () => {
+          openPauseMenu();
+        },
+        isBlocked: () => screenModeRef.current !== 'play',
       },
       { x: initCam.x, y: initCam.y, zoom: 0.9 }
     );
@@ -408,12 +508,19 @@ export function App() {
       cancelAnimationFrame(rafId);
       detach();
     };
-  }, [handleQuickLoad, handleQuickSave, refreshSlots]);
+  }, [handleQuickLoad, handleQuickSave, openPauseMenu, refreshSlots]);
 
   useEffect(() => {
     let autoIdx = 1;
     const timer = window.setInterval(async () => {
-      if (speedRef.current === 0 || stateRef.current.winnerId) return;
+      if (
+        screenModeRef.current !== 'play' ||
+        speedRef.current === 0 ||
+        stateRef.current.winnerId ||
+        stateRef.current.config.isDemo
+      ) {
+        return;
+      }
       try {
         const payload = serializeGameState(stateRef.current);
         await saveStorage.saveSlot(
@@ -495,8 +602,13 @@ export function App() {
     showToast(`Deployed ${config.playerFaction.toUpperCase()} on ${fresh.map.name}`);
   };
 
-  const launchMission = (mission: MissionDef) => {
-    const runBootTour = mission.id === 'boot_sequence' && !hasCompletedWalkthrough();
+  const launchMission = (
+    mission: MissionDef,
+    options?: { forceWalkthrough?: boolean }
+  ) => {
+    const runBootTour =
+      Boolean(options?.forceWalkthrough) ||
+      (mission.id === 'boot_sequence' && !hasCompletedWalkthrough());
     setWalkthroughActive(runBootTour);
     if (runBootTour) {
       setWalkthroughStep(0);
@@ -521,6 +633,13 @@ export function App() {
     }
   };
 
+  const previewMissionBriefing = useCallback((mission: MissionDef) => {
+    const cutscene = BRIEFING_CUTSCENES[mission.id];
+    if (!cutscene) return;
+    pendingMissionVoiceRef.current = null;
+    setActiveCutscene(cutscene);
+  }, []);
+
   const replayWalkthrough = () => {
     startNewMatch(FIRST_BOOT_CONFIG);
     setWalkthroughStep(0);
@@ -533,6 +652,13 @@ export function App() {
     walkthroughActive && walkthroughStep < WALKTHROUGH_STEPS.length
       ? WALKTHROUGH_STEPS[walkthroughStep]
       : undefined;
+
+  const activeMission = getMissionById(hudState.missionId);
+  const operationTitle = hudState.config.isDemo
+    ? 'Feature Showcase Demo'
+    : activeMission
+    ? `${activeMission.codeName} · ${activeMission.title}`
+    : `Skirmish · ${hudState.map.name}`;
 
   return (
     <div className="flex flex-col h-dvh w-dvw overflow-hidden bg-[#070c14] text-slate-100">
@@ -579,10 +705,10 @@ export function App() {
           setSaveModalOpen(true);
         }}
         onOpenNewMatch={() => setNewMatchOpen(true)}
-        onOpenCampaign={() => setCampaignOpen(true)}
+        onOpenCampaign={openCampaignHub}
         onOpenSettings={() => setSettingsOpen(true)}
         onStartDemo={startDemoMode}
-        onReturnHome={returnToHome}
+        onOpenMenu={openPauseMenu}
       />
 
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
@@ -649,13 +775,20 @@ export function App() {
                     ? 'Enemy command infrastructure neutralized.'
                     : 'All friendly command yards and MCVs destroyed.'}
                 </p>
-                <div className="flex justify-center gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setCampaignOpen(true)}
+                    onClick={quitToMenu}
+                    className="rounded border border-slate-600 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800"
+                  >
+                    Main Menu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCampaignHub}
                     className="rounded border border-amber-400/50 px-4 py-2 text-xs font-bold text-amber-200 hover:bg-amber-950/60"
                   >
-                    Campaign
+                    Campaign Hub
                   </button>
                   <button
                     type="button"
@@ -729,7 +862,7 @@ export function App() {
           walkthroughCompleted={hasCompletedWalkthrough()}
           heroImageSrc="/assets/home-hero.jpg"
           onResume={resumeActiveSession}
-          onOpenCampaign={() => setCampaignOpen(true)}
+          onOpenCampaign={openCampaignHub}
           onOpenSkirmish={() => setNewMatchOpen(true)}
           onStartTutorial={replayWalkthrough}
           onStartDemo={startDemoMode}
@@ -740,6 +873,51 @@ export function App() {
           onOpenSettings={() => setSettingsOpen(true)}
         />
       )}
+
+      {screenMode === 'campaign' && (
+        <CampaignHub
+          completedIds={completedMissions}
+          saveSlots={saveSlots}
+          heroImageSrc="/assets/home-hero.jpg"
+          onBackToHome={() => {
+            screenModeRef.current = 'home';
+            setScreenMode('home');
+          }}
+          onLaunchMission={launchMission}
+          onPreviewBriefing={previewMissionBriefing}
+          onLoadSlot={(id) => void handleLoadSlot(id)}
+          onDeleteSlot={async (id) => {
+            await saveStorage.deleteSlot(id);
+            await refreshSlots();
+          }}
+          onImportFile={(file) => void handleImportSaveFile(file)}
+          onResetProgress={() => {
+            setCompletedMissions(resetCampaignProgress());
+            showToast('Campaign progress reset');
+          }}
+        />
+      )}
+
+      <PauseMenuModal
+        open={pauseMenuOpen}
+        operationTitle={operationTitle}
+        factionLabel={hudState.config.playerFaction}
+        elapsedSeconds={hudState.elapsedSeconds}
+        isDemo={Boolean(hudState.config.isDemo)}
+        onResume={resumeFromPause}
+        onSaveAndQuit={saveAndQuitToMenu}
+        onOpenSaves={() => {
+          setPauseMenuOpen(false);
+          void refreshSlots();
+          setSaveModalOpen(true);
+        }}
+        onOpenCampaignHub={openCampaignHub}
+        onOpenSettings={() => {
+          setPauseMenuOpen(false);
+          setSettingsOpen(true);
+        }}
+        onQuitToMenu={quitToMenu}
+      />
 
       <SaveLoadModal
         open={saveModalOpen}
@@ -753,20 +931,7 @@ export function App() {
           await refreshSlots();
           showToast(`Saved "${name}"`);
         }}
-        onLoadSlot={async (id) => {
-          const rec = await saveStorage.loadSlot(id);
-          if (!rec) return;
-          stateRef.current = deserializeGameState(rec.payload);
-          inputRef.current?.setSelection([]);
-          const cam = getConyardCenter(stateRef.current);
-          inputRef.current?.setCameraCenter(cam.x, cam.y, 0.9);
-          speedRef.current = 1;
-          setSimSpeed(1);
-          enterPlayMode();
-          setHudState({ ...stateRef.current });
-          setSaveModalOpen(false);
-          showToast(`Loaded "${rec.meta.name}"`);
-        }}
+        onLoadSlot={handleLoadSlot}
         onDeleteSlot={async (id) => {
           await saveStorage.deleteSlot(id);
           await refreshSlots();
@@ -776,32 +941,13 @@ export function App() {
           exportSaveToFile(payload, `silicon-dawn-t${stateRef.current.tick}`);
           showToast('Exported .sdawn save file');
         }}
-        onImportFile={async (file) => {
-          const { state } = await importSaveFromFile(file);
-          stateRef.current = state;
-          inputRef.current?.setSelection([]);
-          const cam = getConyardCenter(stateRef.current);
-          inputRef.current?.setCameraCenter(cam.x, cam.y, 0.9);
-          speedRef.current = 1;
-          setSimSpeed(1);
-          enterPlayMode();
-          setHudState({ ...stateRef.current });
-          setSaveModalOpen(false);
-          showToast(`Imported ${file.name}`);
-        }}
+        onImportFile={handleImportSaveFile}
       />
 
       <NewMatchModal
         open={newMatchOpen}
         onClose={() => setNewMatchOpen(false)}
         onStartMatch={startNewMatch}
-      />
-
-      <CampaignModal
-        open={campaignOpen}
-        onClose={() => setCampaignOpen(false)}
-        completedIds={completedMissions}
-        onLaunchMission={launchMission}
       />
 
       <SettingsModal
@@ -828,7 +974,7 @@ export function App() {
         script={activeCutscene}
         onClose={() => {
           setActiveCutscene(null);
-          if (!stateRef.current.winnerId) {
+          if (screenModeRef.current === 'play' && !stateRef.current.winnerId) {
             speedRef.current = 1;
             setSimSpeed(1);
           }
@@ -851,7 +997,7 @@ export function App() {
         onLaunchDemo={startDemoMode}
         onOpenCampaign={() => {
           setWalkthroughActive(false);
-          setCampaignOpen(true);
+          openCampaignHub();
         }}
       />
     </div>

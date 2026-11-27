@@ -2,8 +2,8 @@ import {
   Cpu,
   Download,
   FolderOpen,
-  Home,
   Map as MapIcon,
+  Menu,
   MessageSquare,
   Music,
   Pause,
@@ -41,7 +41,7 @@ interface TopBarProps {
   onOpenCampaign: () => void;
   onOpenSettings: () => void;
   onStartDemo: () => void;
-  onReturnHome: () => void;
+  onOpenMenu: () => void;
 }
 
 function formatTime(sec: number): string {
@@ -72,7 +72,7 @@ export function TopBar({
   onOpenCampaign,
   onOpenSettings,
   onStartDemo,
-  onReturnHome,
+  onOpenMenu,
 }: TopBarProps) {
   const powerOk = player.powerRatio >= 1.0;
   const latencyPct = Math.round(player.latencyFactor * 100);
@@ -82,13 +82,13 @@ export function TopBar({
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           type="button"
-          onClick={onReturnHome}
-          title="Return to Home Screen"
-          aria-label="Return to Home Screen"
-          className="flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs font-medium text-slate-200 hover:border-emerald-400/60 hover:text-emerald-200 transition"
+          onClick={onOpenMenu}
+          title="Pause / Save & Quit to Main Menu (Esc)"
+          aria-label="Open Operation Menu"
+          className="flex items-center gap-1.5 rounded border border-emerald-400/45 bg-emerald-950/55 px-2.5 py-1 text-xs font-semibold text-emerald-200 hover:bg-emerald-900/70 transition"
         >
-          <Home className="h-3.5 w-3.5" />
-          <span className="hidden lg:inline">Home</span>
+          <Menu className="h-3.5 w-3.5" />
+          <span>Menu</span>
         </button>
 
         <div className="flex items-center gap-1.5 pr-2 border-r border-slate-800">

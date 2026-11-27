@@ -1,5 +1,5 @@
-const CACHE_NAME = 'silicon-dawn-v4';
-const PRECACHE_URLS = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
+const CACHE_NAME = 'silicon-dawn-v5';
+const PRECACHE_URLS = ['/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -28,13 +28,36 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  // Network-first for HTML / navigation so deployments never serve stale entry points
+  if (req.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        try {
+          const fresh = await fetch(req, { cache: 'no-store' });
+          if (fresh && fresh.status === 200) {
+            void cache.put(req, fresh.clone());
+          }
+          return fresh;
+        } catch {
+          return (
+            (await cache.match(req)) ||
+            (await cache.match('/index.html')) ||
+            (await cache.match('/')) ||
+            Response.error()
+          );
+        }
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cached = await cache.match(req);
       const networkPromise = fetch(req)
         .then((resp) => {
           if (resp && resp.status === 200) {
-            cache.put(req, resp.clone());
+            void cache.put(req, resp.clone());
           }
           return resp;
         })

@@ -7,7 +7,8 @@ import { computeLatencyFactor, spawnBuilding, spawnUnit } from '../src/sim/helpe
 import { MAP_CATALOG, MAP_HEIGHT, MAP_WIDTH } from '../src/sim/mapGen';
 import { computeStateChecksum, deserializeGameState, serializeGameState } from '../src/sim/serialize';
 import type { MatchConfig } from '../src/sim/types';
-import { CloudSyncAdapter, createStorageAdapter } from '../src/storage';
+import { CloudSyncAdapter, createStorageAdapter, type SaveSlotMeta } from '../src/storage';
+import { resetCampaignProgress } from '../src/storage/campaignProgress';
 
 const BASE_CONFIG: MatchConfig = {
   seed: 424242,
@@ -371,5 +372,23 @@ describe('Silicon Dawn full 3-faction simulation, EW, Cyber & Superweapons', () 
       }
     }
     expect(demoState.tick).toBe(DEMO_CHAPTERS.length * 25);
+
+    // Campaign save metadata fields & progress reset helper
+    const metaCheck: SaveSlotMeta = {
+      id: 'slot-campaign-1',
+      name: 'OP-01 · Silicon Siege',
+      kind: 'manual',
+      savedAt: new Date().toISOString(),
+      elapsedSeconds: 42,
+      playerFaction: 'alliance',
+      aiFaction: 'pact',
+      tick: 840,
+      checksum: 'abc123',
+      byteSize: 512,
+      missionId: 'flashpoint_01',
+      mapId: 'peninsula_grid',
+    };
+    expect(metaCheck.missionId).toBe('flashpoint_01');
+    expect(resetCampaignProgress().size).toBe(0);
   });
 });

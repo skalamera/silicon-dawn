@@ -94,6 +94,8 @@ export class IndexedDbSaveAdapter implements SaveStorageAdapter {
       tick: payload.state.tick,
       checksum: payload.checksum,
       byteSize: compressed.byteSize,
+      missionId: payload.state.missionId ?? undefined,
+      mapId: payload.state.map.id,
     };
 
     const row: StoredSlotRow = {

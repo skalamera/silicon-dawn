@@ -20,6 +20,7 @@ export interface InputCallbacks {
   getBoxSelectMode: () => boolean;
   getTouchRadialEnabled?: () => boolean;
   onOpenRadialMenu?: (pos: { sx: number; sy: number; wx: number; wy: number }) => void;
+  onOpenPauseMenu?: () => void;
   isBlocked?: () => boolean;
 }
 
@@ -502,10 +503,15 @@ export class InputController {
       const state = this.cb.getState();
       if (this.cb.getArmedTargeting()) {
         this.cb.clearArmedTargeting();
+        this.cb.clearAttackMoveArmed();
       } else if (state.players.p1.readyBuildingDefId) {
         this.cb.dispatch({ type: 'cancelBuildBuilding', playerId: 'p1' });
+        this.cb.clearAttackMoveArmed();
+      } else if (this.cb.getAttackMoveArmed()) {
+        this.cb.clearAttackMoveArmed();
+      } else {
+        this.cb.onOpenPauseMenu?.();
       }
-      this.cb.clearAttackMoveArmed();
     } else if (e.code >= 'Digit1' && e.code <= 'Digit4') {
       const slot = Number(e.code.replace('Digit', ''));
       if (e.ctrlKey || e.metaKey) {

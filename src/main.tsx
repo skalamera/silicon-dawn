@@ -5,9 +5,24 @@ import './index.css';
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/sw.js').catch(() => {
-      // Service worker registration skipped in restricted contexts
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloaded = false;
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController && !reloaded) {
+        reloaded = true;
+        window.location.reload();
+      }
     });
+
+    void navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        void reg.update();
+      })
+      .catch(() => {
+        // Service worker registration skipped in restricted contexts
+      });
   });
 }
 
